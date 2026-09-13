@@ -45,7 +45,17 @@ your pole 1 and the shared pole are empty, and your pole 3 has disks.
 
 The spec's own example, N = 1, turn order A B A: A lifts disk 1, B lifts disk 2, A
 places disk 1 on 3a and wins. It is [`examples/spec_n1.json`](examples/spec_n1.json)
-and the first test in every layer.
+and the first test in every layer. More recordings in [`examples/`](examples/), each
+showing one rule at work (replay any with `uv run hanoi replay examples/<file>`):
+
+| File | What it shows |
+|---|---|
+| `spec_n1.json` | the spec's example: A wins in three turns |
+| `n1_b_wins.json` | same moves, turn order A B B: B wins instead |
+| `n2_illegal_and_skip.json` | an illegal move wasted as a turn, a skip, A wins at turn 9 |
+| `n1_steal.json` | B takes A's disk off the shared pole and keeps it, then cannot build on it |
+| `n2_unfinished.json` | stops early: replay reports unfinished and offers to continue |
+| `n3_blocked_win.json` | 44 turns: A's tower is done at turn 31 but B's disk blocks the shared pole; B's own lift at turn 44 hands A the win |
 
 What makes it interesting: the sizes interleave, so A's disk 3 can sit under B's
 disk 2; the shared pole is the only scratch pole and both players compete for it;
