@@ -13,6 +13,7 @@ from hanoi_crossing.engine import (
     legal_actions,
     observe,
     step,
+    winner,
 )
 
 # --- types --------------------------------------------------------------------
@@ -212,3 +213,76 @@ def test_opponents_private_poles_are_unreachable() -> None:
     for a in ALL_ACTIONS:
         s2, _ = step(s, "A", a)
         assert s2.poles["1b"] == (2,) and s2.poles["3b"] == ()
+
+
+# --- winner: R11, R13, I1, I4, I6, R10 --------------------------------------------
+
+
+def test_spec_example_n1_a_wins_in_three_steps() -> None:
+    s = initial_state(1)
+    s, o1 = step(s, "A", Action("lift", 1))
+    s, o2 = step(s, "B", Action("lift", 1))
+    s, o3 = step(s, "A", Action("place", 3))
+    assert (o1.done, o2.done) == (False, False)
+    assert o3 == Outcome(legal=True, reason=None, winner="A", done=True)
+    assert winner(s) == "A"
+    assert s.poles["3a"] == (1,) and s.hands["B"] == 2
+
+
+def test_turn_order_abb_lets_b_win_first() -> None:
+    s = initial_state(1)
+    s, _ = step(s, "A", Action("lift", 1))
+    s, _ = step(s, "B", Action("lift", 1))
+    s, out = step(s, "B", Action("place", 3))
+    assert out.winner == "B" and winner(s) == "B"
+
+
+def test_opponents_lift_from_shared_pole_hands_over_the_win() -> None:
+    # A's tower is finished; only B's disk 6 on pole 2 keeps A from winning.
+    s = make({"3a": (5, 3, 1), "2": (6,), "1b": (4, 2)})
+    assert winner(s) is None
+    s2, out = step(s, "B", Action("lift", 2))
+    assert out == Outcome(legal=True, reason=None, winner="A", done=True)
+    assert winner(s2) == "A"
+
+
+def test_all_visible_poles_empty_is_not_a_win() -> None:
+    s = make({"1b": (2,), "3b": (1,)})  # A has nothing anywhere
+    assert winner(s) is None
+
+
+def test_win_with_opponents_disk_in_tower_counts() -> None:
+    s = make({"3a": (6, 5, 3, 1), "1b": (4, 2)})
+    assert winner(s) == "A"
+
+
+def test_finished_game_rejects_every_action_including_skip() -> None:
+    s = make({"3a": (1,), "1b": (2,)})
+    assert winner(s) == "A"
+    assert legal_actions(s, "A") == [] and legal_actions(s, "B") == []
+    for p in ("A", "B"):
+        for a in ALL_ACTIONS:
+            s2, out = step(s, p, a)
+            assert s2 is s
+            assert out == Outcome(legal=False, reason="game is over", winner="A", done=True)
+
+
+def _hanoi(n: int, src: int, dst: int, aux: int) -> list[tuple[int, int]]:
+    if n == 0:
+        return []
+    return _hanoi(n - 1, src, aux, dst) + [(src, dst)] + _hanoi(n - 1, aux, dst, src)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
+def test_solo_play_solves_in_2n_minus_1_moves_without_any_b_turn(n: int) -> None:
+    s = initial_state(n)
+    moves = _hanoi(n, 1, 3, 2)
+    assert len(moves) == 2**n - 1
+    out = None
+    for src, dst in moves:
+        s, out = step(s, "A", Action("lift", src))
+        assert out.legal
+        s, out = step(s, "A", Action("place", dst))
+        assert out.legal
+    assert out is not None and out.winner == "A"
+    assert s.poles["1b"] == initial_state(n).poles["1b"], "B's side untouched"
