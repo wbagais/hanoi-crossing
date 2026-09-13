@@ -3,6 +3,9 @@
 import random
 
 import pytest
+
+from hanoi_crossing.agents import ExternalAgent, RandomAgent, ScriptedAgent, Timeout
+from hanoi_crossing.engine import Action, State, initial_state, winner
 from hanoi_crossing.runner import (
     RunResult,
     Turn,
@@ -14,9 +17,6 @@ from hanoi_crossing.runner import (
     run,
     to_string,
 )
-
-from hanoi_crossing.agents import ExternalAgent, RandomAgent, ScriptedAgent, Timeout
-from hanoi_crossing.engine import Action, State, initial_state, winner
 
 L1, P2, P3, SKIP = Action("lift", 1), Action("place", 2), Action("place", 3), Action("skip")
 
@@ -176,3 +176,13 @@ def test_all_nine_agent_combinations_run_cleanly(kind_a: str, kind_b: str) -> No
     for turn in result.turns:
         assert turn.source == expected[kind_a if turn.player == "A" else kind_b]
     assert isinstance(result.final_state, State)
+
+
+def test_run_calls_on_turn_after_each_turn_with_the_new_state() -> None:
+    seen: list[tuple[int, str, bool]] = []
+
+    def on_turn(turn: Turn, state: State) -> None:
+        seen.append((turn.index, turn.player, state.hands[turn.player] is not None))
+
+    run(initial_state(1), from_string("ABA"), _scripted([L1, P3], [L1]), on_turn=on_turn)
+    assert seen == [(1, "A", True), (2, "B", True), (3, "A", False)]
