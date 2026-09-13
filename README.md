@@ -1,92 +1,137 @@
 # Hanoi Crossing
 
 A two-player Tower of Hanoi variant with a shared middle pole: a pure Python game
-engine, a replay frontend, and a random-play frontend. **Status: work in progress**
-(stages 0–3 of 4 done; see `plans/PLAN.md`).
+engine, a replay frontend, a random-play frontend, and human play. Built for the
+take-home task in [`SPEC.md`](SPEC.md).
 
-The task specification is in [`SPEC.md`](SPEC.md).
+**Status:** complete for the required scope (engine, replay CLI, random play,
+tests, this README). Web UI, HTTP API, RL wrapper, and LLM agent are described
+under [Future work](#future-work) and deliberately not built.
 
 ## Quick start
 
 ```bash
 uv sync
-uv run pytest
+uv run pytest                                  # 172 tests
 uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
 uv run hanoi random --n 3 --seed 7 --trace     # two random players
 uv run hanoi play --a human --b random --n 2   # you against a random player
 uv run hanoi recordings                        # games saved so far
 ```
 
-## Rules as read
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). No runtime dependencies.
 
-See [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) for the spec restated as
-checkable items, and the worked N = 1 example in
-[`examples/spec_n1.json`](examples/spec_n1.json).
+## The game
 
-## Design decisions
+Two players, A and B. Each owns a start pole (1a / 1b) and a goal pole (3a / 3b).
+The middle pole 2 is shared: both see it and either may lift its top disk. Nobody
+sees the other's private poles or hand.
 
-Every decision, with its reason and the alternatives rejected, is in
-[`docs/DECISIONS.md`](docs/DECISIONS.md). This section will summarize it once the
-engine and frontends exist.
+```
+        1a
+        |
+ 1b -- [2] -- 3b
+        |
+        3a
+```
 
-## Engine
+A starts with the odd disks (1, 3, 5, …) on 1a, B with the even disks (2, 4, 6, …)
+on 1b, N each, largest at the bottom. A disk may only be placed on an empty pole or
+on a strictly larger disk. On your turn you do exactly one thing: **lift** the top
+disk of a visible pole into your hand, **place** the held disk on a visible pole, or
+**skip**. One disk in hand at most. An illegal action changes nothing and the turn
+is lost. Turn order is an input, not a rule. You **win** when your hand is empty,
+your pole 1 and the shared pole are empty, and your pole 3 has disks.
 
-`src/hanoi_crossing/engine.py`, 267 lines, no dependencies, no I/O, no randomness.
-Pure functions over an immutable `State`:
+The spec's own example, N = 1, turn order A B A: A lifts disk 1, B lifts disk 2, A
+places disk 1 on 3a and wins. It is [`examples/spec_n1.json`](examples/spec_n1.json)
+and the first test in every layer.
+
+What makes it interesting: the sizes interleave, so A's disk 3 can sit under B's
+disk 2; the shared pole is the only scratch pole and both players compete for it;
+disks can cross sides for good; an opponent lifting their disk off the shared pole
+can hand you the win; and finishing your tower is not enough while anything sits on
+pole 2. A worked N = 3 game and every rule as a checkable item are in
+[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+
+## Interpretations
+
+Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
+
+1. **All visible poles empty is not a win.** Pole 3 must hold a disk.
+2. **Poles are named from the actor's side**, 1 / 2 / 3. "A lifts from 1b" cannot
+   even be expressed, which removes a whole class of invalid input.
+3. **Malformed input raises; a well-formed but illegal move wastes the turn** and
+   reports why. Garbage is a programming error, an illegal move is part of the game.
+4. **A finished game is frozen.** Every further action, even skip, is rejected.
+5. **Three ways a game ends:** *won*; *stalemate* when the same position with the
+   same player to move has occurred K times (the spec has no exit besides winning,
+   and two skipping players must terminate); *unfinished* when the schedule runs out.
+6. **Both players are checked for a win after every action**, because an opponent's
+   move can complete yours.
+7. **Ownership is not tracked after setup.** Any player may lift any top disk from
+   pole 2 and build with it; the win condition never mentions whose disks they are.
+
+## Design
+
+Every decision, with its reason and the alternatives rejected, is numbered in
+[`docs/DECISIONS.md`](docs/DECISIONS.md). The short version:
+
+### Engine (`engine.py`, 267 lines)
+
+Pure functions over an immutable `State`. No I/O, no randomness, no turn counter,
+no stored "finished" flag: `winner(state)` is recomputed from the board.
 
 | Function | Purpose |
 |---|---|
-| `initial_state(n)` | starting position: A has odd disks, B even |
-| `observe(state, player)` | the partial view that player may see |
-| `legal_actions(state, player)` | the subset of the seven actions legal now |
-| `step(state, player, action)` | apply one action; returns a new state and an outcome |
-| `winner(state)` | who has won, computed from the board |
+| `initial_state(n)` | starting position |
+| `observe(state, player)` | the partial view that player may see: own 1 and 3, shared 2, own hand |
+| `legal_actions(state, player)` | the subset of the seven actions legal now; the action mask |
+| `step(state, player, action)` | apply one action; returns a new state and an `Outcome` |
+| `winner(state)` | who has won, if anyone |
 | `to_dict` / `from_dict` | JSON round trip |
 
-The seven actions are `lift 1..3`, `place 1..3`, `skip`, numbered from the acting
-player's side. An illegal move returns the same state object with a reason; a
-finished game rejects everything. Both players are checked for a win after every
-step because an opponent's lift from the shared pole can complete your win.
+The action space is fixed and index-stable: `lift 1..3`, `place 1..3`, `skip`. An
+illegal move returns the *same* state object plus a reason, so a wasted turn is
+cheap to detect. Disks are plain integers equal to their size. The state hashes by
+content, which is what makes stalemate detection a `Counter` lookup.
 
-## Agents, runner, recording
+### Agents (`agents.py`)
 
-- `agents.py` answers "how is a move chosen". An agent gets an `Observation` and
-  the legal actions and returns one `Action`; it never sees the full state.
-  `RandomAgent` picks uniformly (seeded), `ScriptedAgent` replays recorded moves
-  verbatim, `ExternalAgent` asks an injected function (a prompt, a UI, a model)
-  and falls back to another agent on timeout.
-- `runner.py` is the only game loop: `play_turn` plays one turn, `run` loops it
-  over an external schedule and stops on a win, a stalemate (repeated position),
-  or the end of the schedule. Every turn is recorded with its outcome and source.
-- `recording.py` is the JSON file format:
+An agent answers one question, "how is a move chosen": it receives an `Observation`
+and the legal actions and returns an `Action`. It never sees the full state. This is
+the contract an RL policy, an LLM, or a network client would implement; the random
+agent proves it works. Three kinds: `RandomAgent` (seeded), `ScriptedAgent` (replays
+recorded moves verbatim, illegal ones included), `ExternalAgent` (asks an injected
+function and falls back to another agent on timeout). Any agent can play either
+side, so all nine combinations work and are tested.
 
-  ```json
-  {"n": 1, "turn_order": "ABA", "moves": ["lift 1", "lift 1", "place 3"]}
-  ```
+### One runner (`runner.py`)
 
-  Replay is the same loop with both players scripted from the file, restarted
-  from the initial position. A random game can be saved with `from_run` and
-  replayed to the identical final state.
+`play_turn` does observe → choose → step → record for one player. `run` loops it over
+an external schedule and stops on a win, a stalemate, or the end of the schedule,
+counting the unplayed remainder. Replay, random play, human play, and continuing an
+unfinished game are all `run` with different agents and start states. Each `Turn`
+records the action, the outcome, and its **source**: human, random, scripted, or
+timeout.
 
-## Frontends
+### Recording format (`recording.py`)
 
-One command, `hanoi`, with four subcommands. All of them build a start state, a
-schedule, and one agent per player, then hand those to the single runner.
+```json
+{"n": 2, "turn_order": "AABBAABAA",
+ "moves": ["lift 1", "place 2", "lift 1", "place 2", "lift 1", "place 3", "skip", "lift 2", "place 3"],
+ "sources": ["human", "human", "random", "random", "human", "human", "random", "human", "human"]}
+```
 
-| Command | What it does |
-|---|---|
-| `hanoi replay FILE` | re-plays a recording from the initial position and prints the final state; if it ends unfinished, offers to let random agents finish it |
-| `hanoi random --n N` | both players random; same as `play --a random --b random` |
-| `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans get a 30 s move timeout with a random fallback |
-| `hanoi recordings` | lists the games autosaved to `recordings/` |
+`turn_order` is a separate field because the spec calls the turn order external.
+Moves are player-relative. `sources` is optional and informational. A replay always
+restarts from the initial position; the file stores moves, never board states.
 
-Shared flags: `--seed` (default 0, so runs are reproducible), `--json`, `--list`
-(bracket lists instead of drawn towers), `--trace` (one line per turn with the
-move's source: human, random, scripted, or timeout). Game flags: `--first A|B`,
-`--schedule AB`, `--max-turns`, `--repetition-limit` (stalemate detection, default
-10), `--no-skip`, `--save FILE`, `--no-save`. Every finished game is autosaved.
+### Output formats
 
-A human turn looks like this:
+Drawn towers by default; `--list` for bracket lists in the spec's cross layout;
+`--json` for machines; `--trace` for one line per turn with its source. A human
+turn:
 
 ```
 Turn 4, player B                     hand: (2)
@@ -103,38 +148,142 @@ B> place 2
   illegal: disk 2 cannot go on disk 1. Turn wasted.
 ```
 
+The final board shows both sides, then a summary:
+`status won · winner A · played 44 · illegal 2 · skipped 6 · timeouts 0 · unplayed 0`.
+
+## Frontends
+
+One command, `hanoi`. All subcommands build a start state, a schedule, and one agent
+per player, then hand those to the single runner.
+
+| Command | What it does |
+|---|---|
+| `hanoi replay FILE` | re-plays a recording from the initial position, prints the final state; if unfinished, offers to let random agents finish (`--continue` / `--no-continue` pre-answer; never asks with `--json` or without a TTY) |
+| `hanoi random --n N` | both players random; same as `play --a random --b random` |
+| `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans have `--move-timeout` seconds (default 30) before a random move is played for them |
+| `hanoi recordings` | lists games autosaved to `recordings/` |
+
+Shared flags: `--seed` (default 0, so runs are reproducible; pass another number for a
+different game), `--json`, `--list`, `--trace`. Game flags: `--first A|B`,
+`--schedule AB` (any pattern of A and B, repeated), `--max-turns 1000`,
+`--repetition-limit 10` (stalemate detection, `0` disables), `--no-skip`,
+`--save FILE`, `--no-save`. Every finished game is autosaved once, at the end.
+Exit codes: 0 ok, 1 bad recording, 2 bad arguments.
+
 ## Reuse: RL loop and simulation service (not built)
 
-_Stage 4: how an RL wrapper and a game service would use the engine unchanged._
+The spec asks that the engine serve, unchanged, as the core of an RL training loop
+or of a service holding many games. Nothing of the sort is built; here is why no
+change would be needed.
 
-## AI usage
+**RL.** A policy is one more `Agent`: `choose` runs a network over the observation
+and picks among the legal actions. The environment wrapper is about thirty lines
+outside the engine:
 
-Claude Code (Claude Fable 5.1) was used throughout, under human direction:
+```python
+class HanoiEnv:  # sketch, not shipped
+    def reset(self, n):
+        self.state = initial_state(n)
+        return encode(observe(self.state, "A"))  # fixed-size vector
 
-- **Planning:** a long design conversation to read the rules, find their edge cases
-  (opponent-assisted wins, disks crossing sides, stalemates), and settle every
-  interpretation; the plan in `plans/PLAN.md` and the two docs in `docs/` came out
-  of it. Every choice was proposed by the model and accepted, changed, or rejected
-  by the author.
-- **Stage 0:** scaffold, tooling, and documentation skeleton written by the model
-  from the approved plan.
-- **Stage 1:** engine tests written first, then the engine, in red/green commit
-  pairs; the author reviewed each pair. Decisions D22–D25 logged.
-- **Stage 2:** agents, runner, and recording format, same red/green pattern.
-  Decisions D26–D31 logged.
-- **Stage 3:** renderer and CLI, same pattern; the author approved the tower
-  output before it became the golden text. Decisions D32–D36 logged.
+    def step(self, action_index, player):
+        action = ALL_ACTIONS[action_index]  # index-stable space of 7
+        mask = legal_actions(self.state, player)  # action mask
+        self.state, out = step(self.state, player, action)
+        reward = 1 if out.winner == player else -1 if out.winner else -0.01
+        if not out.legal:
+            reward -= 0.1  # trainer's choice, not ours
+        return encode(observe(self.state, player)), reward, out.done, mask
+```
 
-Later stages append their own entry.
+The three properties this relies on are already tested: `observe` leaks nothing the
+agent may not see, `ALL_ACTIONS` has a fixed order, and `step` never consults who
+moved last, so self-play, a random opponent, or any turn schedule are the trainer's
+business.
 
-## Layout
+**Service.** A game is a `State` value: immutable, hashable, and one `to_dict`
+away from JSON. A server holds `dict[game_id, State]`, applies `step` per request,
+and never worries about one request corrupting another. The stage 3 CLI already
+drives the engine "one move at a time" through `play_turn`, which is exactly the
+shape a request handler has.
+
+## Additions beyond the spec
+
+Marked as such so a reviewer can separate what was asked from what we chose:
+human play with a move timeout and random fallback; per-turn move sources; autosave
+of every finished game and `hanoi recordings`; continuing an unfinished replay;
+stalemate detection; drawn tower output.
+
+## Rejected alternatives
+
+One line each; the full reasoning is in the decision log.
+
+- A mutable `Game` object with internal counters: harder to snapshot, share, and
+  replay than a value.
+- A "game type" concept: loses mixed agents, which RL needs (learning agent versus
+  fixed opponent).
+- A player-tagged list of steps as the recording format: turn order becomes implicit.
+- Starter chosen by the seed: surprising; `--first` rotates the pattern instead.
+- Repetition limit 3 as in chess: random agents revisit positions so often that most
+  random games would end as stalemates; default is 10.
+- Writing the recording after every turn: unnecessary; once at the end is enough.
+- Poetry, Docker, HTML docs, a pytest pre-commit hook: see D10.
+
+## Future work
+
+- **Web UI + HTTP API.** FastAPI in an optional extra; one page with an SVG board;
+  endpoints to create a game, load a recording, move, advance bots, continue; raw
+  `observe` / `step` endpoints for remote agents. Same engine, agents, and
+  `play_turn`, one request per turn instead of a blocking loop.
+- **RL.** The wrapper sketched above plus a trainer.
+- **LLM agent.** `choose` prompts a local model with the observation and legal
+  actions, parses the reply, falls back to skip. Slow and weak at Hanoi; a
+  demonstration of the agent seam, not a player.
+
+## Layout, tests, lint
 
 ```
 SPEC.md               the task, verbatim
 docs/REQUIREMENTS.md  spec restated with IDs; interpretations and additions
-docs/DECISIONS.md     decision log
-plans/PLAN.md         stage plan with status lines
-examples/             recordings used as fixtures
-src/hanoi_crossing/   the package
-tests/                pytest suite
+docs/DECISIONS.md     decision log, D1–D36
+plans/PLAN.md         the stage plan, traceability table, status per stage
+examples/spec_n1.json the spec's example as a recording
+src/hanoi_crossing/
+  engine.py           rules (267 lines, guarded by a test at < 500)
+  agents.py           Random / Scripted / External agents
+  runner.py           play_turn, run, schedules
+  recording.py        JSON format
+  render.py           towers, lists, trace, summary
+  cli.py              the hanoi command
+tests/                172 tests; the engine is tested directly, the CLI through main()
 ```
+
+```bash
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+uv run pre-commit install        # ruff hooks; no pytest hook, so red TDD commits pass
+```
+
+## AI usage
+
+Claude Code (Claude Fable 5.1) was used throughout, under human direction. The
+model proposed; the author questioned, changed, or accepted every decision, and the
+decision log records which.
+
+- **Planning:** a long design conversation to read the rules, find their edge cases
+  (opponent-assisted wins, disks crossing sides, stalemates, timeouts), settle every
+  interpretation, and agree the architecture step by step. The plan, the
+  requirements doc, and the first twenty decisions came out of it.
+- **Stage 0:** scaffold, tooling, and documentation skeleton from the approved plan.
+- **Stage 1:** engine tests written first, then the engine, in red/green commit
+  pairs. D22–D25.
+- **Stage 2:** agents, runner, recording format, same pattern. D26–D31.
+- **Stage 3:** renderer and CLI, same pattern; the author approved the tower output
+  before it became the golden text. D32–D36.
+- **Stage 4:** this README, assembled from the decision log and requirements.
+
+## Journey
+
+Read [`plans/PLAN.md`](plans/PLAN.md) for the plan as approved, then `git log`: every
+unit is a `test:` commit that fails followed by a `feat:` commit that passes, and
+each stage ends with a `docs:` commit that logs its decisions.
