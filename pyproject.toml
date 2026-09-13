@@ -1,0 +1,31 @@
+[project]
+name = "hanoi-crossing"
+version = "0.1.0"
+description = "Hanoi Crossing: a two-player Tower of Hanoi engine with replay and random-play frontends"
+readme = "README.md"
+authors = [
+    { name = "Wejdan Bagais", email = "w.bagais@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.9.11,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "ruff>=0.16.7",
+]
