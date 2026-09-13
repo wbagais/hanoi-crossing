@@ -108,41 +108,6 @@ Prints one line per file: name, `n`, seed (from the file name), turns, status,
 winner, modification time. Status comes from replaying the file. Prints
 `no recordings in recordings/` when the folder is empty or missing.
 
-## `--json` output
-
-```bash
-uv run hanoi replay examples/spec_n1.json --json
-uv run hanoi random --n 2 --seed 7 --json | jq '.winner, .counts'
-```
-
-Stdout is exactly one JSON object; the header and any human interaction go to
-stderr. Abridged example for the spec game:
-
-```json
-{
-  "n": 1, "seed": 0, "schedule": "ABA", "file": "examples/spec_n1.json",
-  "status": "won", "winner": "A",
-  "state": {"n": 1, "poles": {"1a": [], "2": [], "3a": [1], "1b": [], "3b": []},
-            "hands": {"A": null, "B": 2}},
-  "counts": {"played": 3, "illegal": 0, "skipped": 0, "timeouts": 0, "unplayed": 0},
-  "turns": [
-    {"index": 1, "player": "A", "action": "lift 1", "legal": true, "reason": null, "source": "scripted"},
-    {"index": 2, "player": "B", "action": "lift 1", "legal": true, "reason": null, "source": "scripted"},
-    {"index": 3, "player": "A", "action": "place 3", "legal": true, "reason": null, "source": "scripted"}
-  ],
-  "saved": null
-}
-```
-
-| Field | Meaning |
-|---|---|
-| `n`, `seed`, `schedule`, `file` | how the game was set up (`file` only for replay; `continued: true` when a replay was continued) |
-| `status`, `winner` | `won` / `unfinished` / `stalemate`; `A`, `B`, or `null` |
-| `state` | the final board in the engine's `to_dict` form: poles bottom to top, hands |
-| `counts` | played, illegal, skipped, timeouts, unplayed |
-| `turns` | every turn: index, player, action, `legal`, `reason` when illegal, `source` (human / random / scripted / timeout) |
-| `saved` | autosave path, or `null` |
-
 ## Exit codes
 
 | Code | Meaning |
