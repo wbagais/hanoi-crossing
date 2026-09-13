@@ -203,3 +203,40 @@ makes the decision. The README's design section is a summary of this log.
 - **Choice:** `to_agents` splits the moves per player in turn order; `replay`
   calls the one runner from `initial_state(n)`. Recorded illegal moves are
   wasted again, exactly as the spec requires (R9).
+
+## Stage 3
+
+### D32. `run` gains an optional `on_turn` callback
+- **Context:** human play needs live output per turn (bot moves, results,
+  timeouts) without the CLI owning a second loop.
+- **Choice:** `run(..., on_turn=None)` calls back after every played turn with
+  the turn and the new state. The loop stays the only loop.
+- **Rejected:** driving `play_turn` from the CLI (duplicates status and stalemate
+  logic); printing inside agents (agents must stay I/O-free).
+
+### D33. Stdin timeout via a reader thread and a queue
+- **Choice:** one daemon thread pumps stdin lines into a queue for the whole
+  session; the prompt waits with `queue.get(timeout)`. End of input is a `None`
+  sentinel that is put back so later prompts see it immediately.
+- **Reason:** portable (no signals, works with a redirected stdin in tests); a
+  deadline covers the whole turn, including re-prompts after unparseable text.
+- **Rejected:** `select` on stdin (not portable); `signal.alarm` (Unix only, main
+  thread only).
+
+### D34. End of input counts as "no answer"
+- **Choice:** the human prompt returns `None` at EOF, so the random fallback
+  plays and the turn is marked `timeout`. Every human agent in the CLI always has
+  a fallback, even with `--move-timeout 0`.
+- **Reason:** a closed stdin must never hang or crash the game.
+
+### D35. Continuation recordings are the whole game
+- **Choice:** when an unfinished replay is continued, the autosaved recording is
+  the original moves followed by the continuation moves (sources `scripted` for
+  the original part), so replaying it reproduces the full game from the initial
+  position.
+- **Rejected:** saving only the continuation (would not replay from the start).
+
+### D36. `hanoi recordings` replays each file to report its status
+- **Choice:** the listing shows n, seed (parsed from the file name), turns,
+  status, winner, and modification time. Status comes from a real replay.
+- **Reason:** files are small and replay is instant; a stored status could lie.

@@ -315,7 +315,7 @@ final state; stage 2 marked done.
 
 ### Stage 3 — CLI
 
-**Status:** todo
+**Status:** done
 
 **Goal.** The spec's two frontends plus human play. Entry point `hanoi`. Follows
 §4.1 and §4.2 step for step: Build game (`cli.py`), play loop (`runner.run`),

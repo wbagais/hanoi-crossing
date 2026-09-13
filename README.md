@@ -2,7 +2,7 @@
 
 A two-player Tower of Hanoi variant with a shared middle pole: a pure Python game
 engine, a replay frontend, and a random-play frontend. **Status: work in progress**
-(stages 0–2 of 4 done; see `plans/PLAN.md`).
+(stages 0–3 of 4 done; see `plans/PLAN.md`).
 
 The task specification is in [`SPEC.md`](SPEC.md).
 
@@ -11,9 +11,11 @@ The task specification is in [`SPEC.md`](SPEC.md).
 ```bash
 uv sync
 uv run pytest
+uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
+uv run hanoi random --n 3 --seed 7 --trace     # two random players
+uv run hanoi play --a human --b random --n 2   # you against a random player
+uv run hanoi recordings                        # games saved so far
 ```
-
-CLI commands arrive in stage 3 (`hanoi replay`, `hanoi random`, `hanoi play`).
 
 ## Rules as read
 
@@ -68,7 +70,38 @@ step because an opponent's lift from the shared pole can complete your win.
 
 ## Frontends
 
-_Stage 3._
+One command, `hanoi`, with four subcommands. All of them build a start state, a
+schedule, and one agent per player, then hand those to the single runner.
+
+| Command | What it does |
+|---|---|
+| `hanoi replay FILE` | re-plays a recording from the initial position and prints the final state; if it ends unfinished, offers to let random agents finish it |
+| `hanoi random --n N` | both players random; same as `play --a random --b random` |
+| `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans get a 30 s move timeout with a random fallback |
+| `hanoi recordings` | lists the games autosaved to `recordings/` |
+
+Shared flags: `--seed` (default 0, so runs are reproducible), `--json`, `--list`
+(bracket lists instead of drawn towers), `--trace` (one line per turn with the
+move's source: human, random, scripted, or timeout). Game flags: `--first A|B`,
+`--schedule AB`, `--max-turns`, `--repetition-limit` (stalemate detection, default
+10), `--no-skip`, `--save FILE`, `--no-save`. Every finished game is autosaved.
+
+A human turn looks like this:
+
+```
+Turn 4, player B                     hand: (2)
+
+       |            |            |
+       |            |            |
+       |            |            |
+   ====4====       =1=           |
+   ---------    ---------    ---------
+     pole 1       pole 2       pole 3
+
+  legal: place 1, place 3, skip       (30 s)
+B> place 2
+  illegal: disk 2 cannot go on disk 1. Turn wasted.
+```
 
 ## Reuse: RL loop and simulation service (not built)
 
@@ -89,6 +122,8 @@ Claude Code (Claude Fable 5.1) was used throughout, under human direction:
   pairs; the author reviewed each pair. Decisions D22–D25 logged.
 - **Stage 2:** agents, runner, and recording format, same red/green pattern.
   Decisions D26–D31 logged.
+- **Stage 3:** renderer and CLI, same pattern; the author approved the tower
+  output before it became the golden text. Decisions D32–D36 logged.
 
 Later stages append their own entry.
 
