@@ -234,3 +234,34 @@ def step(state: State, player: Player, action: Action) -> tuple[State, Outcome]:
     new = State(n=state.n, poles=poles, hands=hands)
     won = winner(new)
     return new, Outcome(True, None, won, won is not None)
+
+
+def to_dict(state: State) -> dict:
+    """Plain JSON-compatible dict: ints, lists, None. Inverse of ``from_dict``."""
+    return {
+        "n": state.n,
+        "poles": {k: list(state.poles[k]) for k in POLE_KEYS},
+        "hands": {p: state.hands[p] for p in PLAYERS},
+    }
+
+
+def from_dict(data: object) -> State:
+    """Rebuild a State from ``to_dict`` output, validating shape and types."""
+    if not isinstance(data, dict) or set(data) != {"n", "poles", "hands"}:
+        raise ValueError("state dict needs exactly the keys n, poles, hands")
+    n, poles, hands = data["n"], data["poles"], data["hands"]
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+        raise ValueError(f"n must be a positive integer, got {n!r}")
+    if not isinstance(poles, dict) or set(poles) != set(POLE_KEYS):
+        raise ValueError(f"poles must have exactly the keys {POLE_KEYS}")
+    if not isinstance(hands, dict) or set(hands) != set(PLAYERS):
+        raise ValueError(f"hands must have exactly the keys {PLAYERS}")
+    for key, disks in poles.items():
+        if not isinstance(disks, list | tuple) or not all(
+            isinstance(d, int) and not isinstance(d, bool) and d > 0 for d in disks
+        ):
+            raise ValueError(f"pole {key} must be a list of positive ints, got {disks!r}")
+    for p, held in hands.items():
+        if held is not None and (not isinstance(held, int) or isinstance(held, bool) or held < 1):
+            raise ValueError(f"hand {p} must be a positive int or null, got {held!r}")
+    return State(n=n, poles={k: tuple(poles[k]) for k in POLE_KEYS}, hands=dict(hands))
