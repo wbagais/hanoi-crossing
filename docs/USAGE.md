@@ -156,8 +156,21 @@ stderr. Abridged example for the spec game:
 | Status | Meaning |
 |---|---|
 | `won` | A player's hand is empty, their pole 1 and the shared pole are empty, and their pole 3 has disks. Checked for both players after every action. |
-| `unfinished` | The game stopped before anyone won: the schedule ran out (`--max-turns`); the recording stopped; a human typed `quit` or pressed Ctrl-C; or a human failed to answer `--max-timeouts` prompts in a row (default 3) and is treated as gone. The printed `game ended: …` line says which. The game is autosaved and can be continued with `replay --continue`. |
-| `stalemate` | Only with `--repetition-limit`: the same position with the same player to move recurred K times. |
+| `stalemate` | Only with `--repetition-limit K`: the same position with the same player to move recurred K times. |
+| `unfinished` | The game stopped before anyone won. One of the reasons below; the printed `game ended: …` line says which. |
+
+Reasons a game is `unfinished`:
+
+| Reason | When | Output line |
+|---|---|---|
+| Schedule ran out | `--max-turns` reached | none; the summary shows `unplayed 0` |
+| Recording stopped | a replay whose file ends before a win | none; replay offers to continue |
+| Player quit | a human typed `quit`, `q`, or `exit` | `game ended: player A quit` |
+| Interrupted | Ctrl-C during a human turn | `game ended: interrupted` |
+| Player treated as gone | a human did not answer `--max-timeouts` prompts in a row (default 3) | `game ended: player A did not answer 3 prompts in a row` |
+
+Every unfinished game is autosaved and can be picked up later with
+`hanoi replay <file> --continue`.
 
 ## Examples
 
