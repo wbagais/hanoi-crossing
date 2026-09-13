@@ -8,6 +8,7 @@ from hanoi_crossing.agents import ExternalAgent, RandomAgent, ScriptedAgent, Tim
 from hanoi_crossing.engine import Action, State, initial_state, winner
 from hanoi_crossing.runner import (
     RunResult,
+    StopGame,
     Turn,
     from_string,
     play_turn,
@@ -186,3 +187,18 @@ def test_run_calls_on_turn_after_each_turn_with_the_new_state() -> None:
 
     run(initial_state(1), from_string("ABA"), _scripted([L1, P3], [L1]), on_turn=on_turn)
     assert seen == [(1, "A", True), (2, "B", True), (3, "A", False)]
+
+
+def test_stop_game_raised_by_an_agent_ends_the_run_as_unfinished() -> None:
+    class Quitter:
+        kind = "human"
+        last_fell_back = False
+
+        def choose(self, observation, legal):  # noqa: ANN001, ANN202
+            raise StopGame("player quit")
+
+    agents = {"A": ScriptedAgent([L1, P3]), "B": Quitter()}
+    result = run(initial_state(1), from_string("ABAB"), agents)
+    assert result.status == "unfinished" and result.winner is None
+    assert len(result.turns) == 1 and result.unplayed == 3
+    assert result.final_state.hands["A"] == 1

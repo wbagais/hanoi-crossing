@@ -315,3 +315,68 @@ def test_random_game_with_explicit_repetition_limit_can_stalemate() -> None:
     assert json.loads(out)["status"] in ("stalemate", "won")
     _, out = run_cli("random", "--n", "1", "--seed", "0", "--no-save", "--json")
     assert json.loads(out)["status"] == "won"
+
+
+# --- ending a game early -----------------------------------------------------------------
+
+
+def _play(stdin: str, *extra: str) -> tuple[int, str]:
+    return run_cli(
+        "play",
+        "--a",
+        "human",
+        "--b",
+        "random",
+        "--n",
+        "2",
+        "--seed",
+        "0",
+        "--no-save",
+        "--json",
+        "--max-turns",
+        "200",
+        *extra,
+        stdin=stdin,
+    )
+
+
+def test_typing_quit_ends_the_game_unfinished() -> None:
+    code, out = _play("lift 1\nquit\n", "--move-timeout", "0")
+    data = json.loads(out)
+    assert code == 0 and data["status"] == "unfinished"
+    assert [t["action"] for t in data["turns"][:1]] == ["lift 1"]
+    assert len(data["turns"]) <= 3
+
+
+def test_three_consecutive_timeouts_end_the_game() -> None:
+    code, out = _play("", "--move-timeout", "0.05")
+    data = json.loads(out)
+    assert code == 0 and data["status"] == "unfinished"
+    human_turns = [t for t in data["turns"] if t["player"] == "A"]
+    assert len(human_turns) == 3 and all(t["source"] == "timeout" for t in human_turns)
+
+
+def test_max_timeouts_flag_changes_the_count_and_zero_disables() -> None:
+    _, out = _play("", "--move-timeout", "0.02", "--max-timeouts", "1")
+    assert len([t for t in json.loads(out)["turns"] if t["player"] == "A"]) == 1
+    _, out = _play("", "--move-timeout", "0.02", "--max-timeouts", "0", "--max-turns", "10")
+    assert len([t for t in json.loads(out)["turns"] if t["player"] == "A"]) == 5
+
+
+def test_quit_message_is_printed_in_text_mode() -> None:
+    _, out = run_cli(
+        "play",
+        "--a",
+        "human",
+        "--b",
+        "human",
+        "--n",
+        "1",
+        "--seed",
+        "0",
+        "--no-save",
+        "--move-timeout",
+        "0",
+        stdin="quit\n",
+    )
+    assert "game ended: player A quit" in out and "status unfinished" in out
