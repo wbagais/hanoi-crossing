@@ -330,7 +330,7 @@ Shared flags:
 |---|---|---|---|
 | `--json` | optional | off | Machine-readable output; disables prompts. |
 | `--list` | optional | off | Bracket lists `[4, 2]` instead of drawn towers. |
-| `--trace` | optional | off | One line per turn before the final board. |
+| `--no-trace` | optional | off | Hide the turn-by-turn lines; the full trace is shown by default (D38). |
 | `--seed S` | optional | `0` | Seeds random agents. Same seed, same game; printed. |
 
 `hanoi replay FILE` — reads the file once, restarts from the initial position,

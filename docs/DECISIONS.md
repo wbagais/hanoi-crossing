@@ -251,3 +251,13 @@ makes the decision. The README's design section is a summary of this log.
 - **Reason:** a reviewer reads the README first; the detail is one link away.
 - **Rejected:** copying the decision log into the README (too long); a separate
   ARCHITECTURE.md (the README's design section is short enough).
+
+## After stage 4
+
+### D38. The full game is shown by default
+- **Context:** after playing a game the user wants to see every turn, not only the
+  final board and summary.
+- **Choice:** the turn-by-turn trace (index, player, action, result, source) is
+  printed before the final board for every command; `--no-trace` hides it.
+  `--trace` is still accepted as a no-op so old invocations keep working.
+- **Rejected:** keeping the trace opt-in (the default output hid the game).

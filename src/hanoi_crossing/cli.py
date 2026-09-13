@@ -45,7 +45,10 @@ def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="machine-readable output; no prompts")
     common.add_argument("--list", action="store_true", help="bracket lists instead of towers")
-    common.add_argument("--trace", action="store_true", help="one line per turn before the board")
+    common.add_argument(
+        "--no-trace", action="store_true", help="hide the turn-by-turn lines (shown by default)"
+    )
+    common.add_argument("--trace", action="store_true", help=argparse.SUPPRESS)  # kept, no-op
     common.add_argument("--seed", type=int, default=0, help="seed for random agents (default 0)")
 
     game = argparse.ArgumentParser(add_help=False)
@@ -233,7 +236,7 @@ def _emit(
         }
         session.out.write(json.dumps(payload, indent=2) + "\n")
         return
-    if session.args.trace and result.turns:
+    if not session.args.no_trace and result.turns:
         session.say()
         session.say(render_trace(result.turns, start=start))
     session.say()
