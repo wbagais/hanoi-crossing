@@ -1,5 +1,7 @@
 """Tests for the core engine. IDs in names refer to docs/REQUIREMENTS.md."""
 
+import json
+
 import pytest
 
 from hanoi_crossing import engine
@@ -9,10 +11,12 @@ from hanoi_crossing.engine import (
     Observation,
     Outcome,
     State,
+    from_dict,
     initial_state,
     legal_actions,
     observe,
     step,
+    to_dict,
     winner,
 )
 
@@ -286,3 +290,58 @@ def test_solo_play_solves_in_2n_minus_1_moves_without_any_b_turn(n: int) -> None
         assert out.legal
     assert out is not None and out.winner == "A"
     assert s.poles["1b"] == initial_state(n).poles["1b"], "B's side untouched"
+
+
+# --- serialization: T6 -----------------------------------------------------------
+
+
+def test_to_dict_is_plain_json_compatible() -> None:
+    d = to_dict(initial_state(2))
+    assert d == {
+        "n": 2,
+        "poles": {"1a": [3, 1], "2": [], "3a": [], "1b": [4, 2], "3b": []},
+        "hands": {"A": None, "B": None},
+    }
+    json.dumps(d)  # must not raise
+
+
+def test_round_trip_initial_and_mid_game() -> None:
+    s = initial_state(3)
+    assert from_dict(to_dict(s)) == s
+    s, _ = step(s, "A", Action("lift", 1))
+    s, _ = step(s, "B", Action("lift", 1))
+    s, _ = step(s, "A", Action("place", 2))
+    assert from_dict(json.loads(json.dumps(to_dict(s)))) == s
+
+
+def _good() -> dict:
+    return {
+        "n": 1,
+        "poles": {"1a": [1], "2": [], "3a": [], "1b": [2], "3b": []},
+        "hands": {"A": None, "B": None},
+    }
+
+
+def _with(**changes: object) -> dict:
+    d = _good()
+    d.update(changes)
+    return d
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {},
+        "not a dict",
+        _with(poles={}),
+        _with(poles={"1a": [1], "2": [], "3a": [], "1b": [2]}),  # missing 3b
+        _with(hands={"A": None}),  # missing B
+        _with(poles={"1a": ["1"], "2": [], "3a": [], "1b": [2], "3b": []}),  # str disk
+        _with(hands={"A": "x", "B": None}),
+        _with(n=0),
+        _with(n="1"),
+    ],
+)
+def test_from_dict_rejects_bad_shapes(bad: object) -> None:
+    with pytest.raises(ValueError):
+        from_dict(bad)  # type: ignore[arg-type]
