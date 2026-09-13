@@ -223,3 +223,26 @@ def test_recordings_lists_saved_games(tmp_path) -> None:  # noqa: ANN001
     run_cli("random", "--n", "1", "--seed", "3")
     code, out = run_cli("recordings")
     assert code == 0 and "n=1" in out and "seed=3" in out and ".json" in out
+
+
+# --- full game shown by default -------------------------------------------------------
+
+
+def _trace_lines(out: str) -> list[str]:
+    return [line for line in out.splitlines() if line[:1].isdigit() and " → " in line]
+
+
+def test_full_game_trace_is_shown_by_default() -> None:
+    _, out = run_cli("replay", SPEC)
+    assert [line.split(" → ")[0] for line in _trace_lines(out)] == [
+        "1 A lift 1",
+        "2 B lift 1",
+        "3 A place 3",
+    ]
+    _, out = run_cli("random", "--n", "1", "--seed", "0", "--no-save")
+    assert len(_trace_lines(out)) >= 2
+
+
+def test_no_trace_hides_the_turn_lines() -> None:
+    _, out = run_cli("replay", SPEC, "--no-trace")
+    assert _trace_lines(out) == [] and "status won" in out
