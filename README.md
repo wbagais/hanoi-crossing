@@ -20,6 +20,7 @@ uv run hanoi recordings                        # games saved so far
 ```
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). No runtime dependencies.
+Every command, flag, and default is in [`docs/USAGE.md`](docs/USAGE.md).
 
 ## The game
 
