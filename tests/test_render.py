@@ -1,5 +1,6 @@
 """Text rendering: tower view, list view, final board, trace, summary (R12, T9)."""
 
+from hanoi_crossing.engine import Action, Outcome, State, initial_state, observe
 from hanoi_crossing.render import (
     describe_outcome,
     render_board,
@@ -7,8 +8,6 @@ from hanoi_crossing.render import (
     render_trace,
     render_view,
 )
-
-from hanoi_crossing.engine import Action, Outcome, State, initial_state, observe
 from hanoi_crossing.runner import RunResult, Turn
 
 
@@ -30,7 +29,7 @@ def test_tower_view_draws_disks_to_scale_and_labels_poles() -> None:
     assert "pole 1" in lines[-3] and "pole 2" in lines[-3] and "pole 3" in lines[-3]
     assert lines[-1].strip() == "legal: skip"
     # height = 2n disk rows: rows between header/blank and the base line
-    base_idx = next(i for i, line in enumerate(lines) if set(line.strip()) == {"-"})
+    base_idx = next(i for i, line in enumerate(lines) if set(line.strip()) == {"-", " "})
     assert base_idx - 2 == 2 * 2
 
 
@@ -38,7 +37,7 @@ def test_tower_view_column_width_scales_with_n() -> None:
     for n in (1, 2, 3):
         s = initial_state(n)
         text = render_view(observe(s, "B"), player="B", index=1, n=n, legal=[])
-        base = next(line for line in text.splitlines() if set(line.strip()) == {"-"})
+        base = next(line for line in text.splitlines() if set(line.strip()) == {"-", " "})
         width = len(base.split()[0])
         assert width >= 4 * n + 1 and width % 2 == 1
         biggest = "=" * (2 * n) + str(2 * n) + "=" * (2 * n)
