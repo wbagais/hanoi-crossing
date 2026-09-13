@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import random
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -100,12 +100,15 @@ def run(
     schedule: Sequence[Player],
     agents: Mapping[Player, Agent],
     repetition_limit: int | None = None,
+    on_turn: Callable[[Turn, State], None] | None = None,
 ) -> RunResult:
     """Play ``schedule`` from ``state``. Stops at a win, a stalemate, or the end.
 
     Before each entry the game status is checked: a winner ends the game with
     the remaining entries counted as unplayed; with ``repetition_limit`` set, a
     (state, player-to-move) pair seen that many times ends it as a stalemate.
+    ``on_turn`` is called after every played turn with the turn and the new
+    state, so a frontend can print live without owning the loop.
     """
     turns: list[Turn] = []
     seen: Counter[tuple[State, Player]] = Counter()
@@ -119,5 +122,7 @@ def run(
                 return RunResult(state, tuple(turns), "stalemate", None, len(schedule) - i)
         state, turn = play_turn(state, player, agents[player], i + 1)
         turns.append(turn)
+        if on_turn is not None:
+            on_turn(turn, state)
     won = winner(state)
     return RunResult(state, tuple(turns), "won" if won else "unfinished", won, 0)
