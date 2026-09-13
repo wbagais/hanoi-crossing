@@ -121,7 +121,7 @@ winner, modification time. Status comes from replaying the file. Prints
 | Status | Meaning |
 |---|---|
 | `won` | A player's hand is empty, their pole 1 and the shared pole are empty, and their pole 3 has disks. Checked for both players after every action. |
-| `unfinished` | The schedule ran out (`--max-turns`) or the recording stopped. |
+| `unfinished` | The game stopped before anyone won: the schedule ran out (`--max-turns`); the recording stopped; a human typed `quit` or pressed Ctrl-C; or a human failed to answer `--max-timeouts` prompts in a row (default 3) and is treated as gone. The printed `game ended: …` line says which. The game is autosaved and can be continued with `replay --continue`. |
 | `stalemate` | Only with `--repetition-limit`: the same position with the same player to move recurred K times. |
 
 ## Examples
