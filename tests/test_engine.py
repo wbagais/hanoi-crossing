@@ -1,6 +1,7 @@
 """Tests for the core engine. IDs in names refer to docs/REQUIREMENTS.md."""
 
 import json
+import random
 
 import pytest
 
@@ -345,3 +346,42 @@ def _with(**changes: object) -> dict:
 def test_from_dict_rejects_bad_shapes(bad: object) -> None:
     with pytest.raises(ValueError):
         from_dict(bad)  # type: ignore[arg-type]
+
+
+# --- invariants under random legal play; line budget: C1 -----------------------------
+
+
+def _check_invariants(s: State, n: int) -> None:
+    disks = sorted(d for pole in s.poles.values() for d in pole)
+    disks += sorted(h for h in s.hands.values() if h is not None)
+    assert sorted(disks) == list(range(1, 2 * n + 1)), "disk multiset must be constant"
+    for key, pole in s.poles.items():
+        assert list(pole) == sorted(pole, reverse=True), f"pole {key} not decreasing"
+        assert len(set(pole)) == len(pole)
+    assert sum(1 for p in ("A", "B") if winner(s) == p) <= 1
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_random_legal_play_keeps_invariants(n: int, seed: int) -> None:
+    rng = random.Random(seed)
+    s = initial_state(n)
+    for _ in range(2000):
+        player = rng.choice(("A", "B"))
+        legal = legal_actions(s, player)
+        if not legal:
+            assert winner(s) is not None
+            break
+        assert Action("skip") in legal
+        s, out = step(s, player, rng.choice(legal))
+        assert out.legal
+        _check_invariants(s, n)
+        if out.done:
+            assert out.winner == winner(s) is not None
+            break
+
+
+def test_engine_is_under_500_lines_including_blanks_and_docstrings() -> None:
+    with open(engine.__file__, encoding="utf-8") as fh:
+        total = sum(1 for _ in fh)
+    assert total < 500, f"engine.py has {total} lines; the spec allows fewer than 500"
