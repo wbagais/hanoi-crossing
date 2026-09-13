@@ -253,7 +253,7 @@ line budget · refactor.
 
 ### Stage 2 — Agents, runner, recording
 
-**Status:** todo
+**Status:** done
 
 **Goal.** Play a game end to end from Python. Not counted toward C1.
 

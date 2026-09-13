@@ -161,3 +161,45 @@ makes the decision. The README's design section is a summary of this log.
 - **Result:** 267 lines including the module docstring; the test
   `test_engine_is_under_500_lines_including_blanks_and_docstrings` enforces C1 on
   the strict `wc -l` reading.
+
+## Stage 2
+
+### D26. Agents carry `kind` and `last_fell_back`; the runner derives `Turn.source`
+- **Context:** turns must show who chose each move (A2) without changing the
+  `choose` signature that an RL policy would implement.
+- **Choice:** two attributes on the agent instead of a richer return type. The
+  runner reads them after `choose` and writes `source` (`timeout` when
+  `last_fell_back` is set, else `kind`).
+- **Rejected:** `choose` returning a `(action, source)` pair (leaks a display
+  concern into the agent contract).
+
+### D27. The injected `ask` owns the waiting
+- **Choice:** `ExternalAgent.choose` passes the timeout to `ask` and reacts to a
+  `Timeout` exception or a `None` return. No clock, thread, or `input()` in
+  `agents.py`.
+- **Reason:** the CLI (stdin thread), a UI (request deadline), and tests (a fake)
+  each wait differently; the agent should not care.
+
+### D28. Stalemate counts (state, player-to-move) pairs at the top of each turn
+- **Choice:** `run` keeps a `Counter` keyed on the frozen `State` plus the player
+  about to move; reaching `repetition_limit` ends the game before that turn is
+  played. Off when the limit is `None` or `0`.
+- **Reason:** mutual skipping and cycles both repeat this pair; hashing the state
+  by content (D22) makes the counter trivial.
+
+### D29. `run` checks status before each entry and once after the loop
+- **Choice:** a win found at the top of an entry counts every remaining entry as
+  unplayed; a win on the very last entry is still reported as `won` by the
+  post-loop check.
+
+### D30. Recording validation lives in `Recording.__post_init__`
+- **Choice:** any `Recording`, whether loaded from JSON or built by `from_run`,
+  is validated on construction; `loads` only checks JSON shape and key names
+  first. Unknown top-level keys are rejected.
+- **Reason:** one place to enforce the format; a bad recording can never be
+  written.
+
+### D31. `replay` is `run` with scripted agents
+- **Choice:** `to_agents` splits the moves per player in turn order; `replay`
+  calls the one runner from `initial_state(n)`. Recorded illegal moves are
+  wasted again, exactly as the spec requires (R9).
