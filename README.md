@@ -2,7 +2,7 @@
 
 A two-player Tower of Hanoi variant with a shared middle pole: a pure Python game
 engine, a replay frontend, and a random-play frontend. **Status: work in progress**
-(stage 0 of 4 done; see `plans/PLAN.md`).
+(stages 0–1 of 4 done; see `plans/PLAN.md`).
 
 The task specification is in [`SPEC.md`](SPEC.md).
 
@@ -29,7 +29,22 @@ engine and frontends exist.
 
 ## Engine
 
-_Stage 1._
+`src/hanoi_crossing/engine.py`, 267 lines, no dependencies, no I/O, no randomness.
+Pure functions over an immutable `State`:
+
+| Function | Purpose |
+|---|---|
+| `initial_state(n)` | starting position: A has odd disks, B even |
+| `observe(state, player)` | the partial view that player may see |
+| `legal_actions(state, player)` | the subset of the seven actions legal now |
+| `step(state, player, action)` | apply one action; returns a new state and an outcome |
+| `winner(state)` | who has won, computed from the board |
+| `to_dict` / `from_dict` | JSON round trip |
+
+The seven actions are `lift 1..3`, `place 1..3`, `skip`, numbered from the acting
+player's side. An illegal move returns the same state object with a reason; a
+finished game rejects everything. Both players are checked for a win after every
+step because an opponent's lift from the shared pole can complete your win.
 
 ## Frontends
 
@@ -50,6 +65,8 @@ Claude Code (Claude Fable 5.1) was used throughout, under human direction:
   by the author.
 - **Stage 0:** scaffold, tooling, and documentation skeleton written by the model
   from the approved plan.
+- **Stage 1:** engine tests written first, then the engine, in red/green commit
+  pairs; the author reviewed each pair. Decisions D22–D25 logged.
 
 Later stages append their own entry.
 

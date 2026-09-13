@@ -206,7 +206,7 @@ exist; stage 0 marked done.
 
 ### Stage 1 — Engine
 
-**Status:** todo
+**Status:** done
 
 **Goal.** `engine.py`: the complete rules as pure functions over an immutable state.
 

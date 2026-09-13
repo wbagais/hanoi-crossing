@@ -132,3 +132,32 @@ makes the decision. The README's design section is a summary of this log.
 - **Choice:** `docs/REQUIREMENTS.md` restates the spec with IDs; this log holds
   decisions; `plans/PLAN.md` is the working plan with a status line per stage.
 - **Reason:** a reviewer can see what was given versus what we chose.
+
+## Stage 1
+
+### D22. `State` hashes by content despite dict fields
+- **Context:** frozen dataclasses with dict fields are not hashable by default.
+- **Choice:** keep `poles` / `hands` as plain dicts (readable key access) and
+  define `__hash__` over the values in fixed key order; `__post_init__` copies the
+  mappings and converts pole sequences to tuples.
+- **Reason:** states must be usable as set members and dict keys (stalemate
+  detection in the runner, caching in a service) while staying readable.
+- **Rejected:** tuple-of-tuples storage with positional access (unreadable);
+  `MappingProxyType` (still unhashable).
+
+### D23. Validation split: `_validate` raises, `_illegal_reason` explains
+- **Choice:** malformed player/verb/pole raises `ValueError` before anything else;
+  a well-formed action gets a reason string or `None`. `legal_actions` is defined
+  as "the actions whose reason is None", so the two can never disagree.
+- **Rejected:** a separate legality table that `step` and `legal_actions` each
+  consult (two sources of truth).
+
+### D24. `bool` is not an int here
+- **Choice:** `initial_state` and `from_dict` reject `True`/`False` for `n`, disks,
+  and hands even though `bool` subclasses `int`.
+- **Reason:** a JSON `true` sneaking in as disk size 1 would be a silent bug.
+
+### D25. Engine size
+- **Result:** 267 lines including the module docstring; the test
+  `test_engine_is_under_500_lines_including_blanks_and_docstrings` enforces C1 on
+  the strict `wc -l` reading.
