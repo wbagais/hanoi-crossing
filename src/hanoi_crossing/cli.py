@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import IO
 
 from .agents import Agent, ExternalAgent, RandomAgent, Timeout
-from .engine import Action, Observation, State, initial_state, to_dict
+from .engine import Action, Observation, State, initial_state, pole_key, to_dict
 from .recording import Recording, RecordingFormatError, dump, from_run, load, parse_action, replay
 from .render import (
     counts,
@@ -199,9 +199,27 @@ def _on_turn_factory(session: Session, agents: dict[str, Agent], prompts: dict[s
                 "  " + describe_outcome(turn.action, turn.outcome, state.hands[turn.player], before)
             )
         else:
-            session.say(f"Turn {turn.index}, player {turn.player}: {_fmt(turn.action)}")
+            session.say(f"Turn {turn.index}, player {turn.player}: {_describe_bot(turn, state)}")
 
     return on_turn
+
+
+def _describe_bot(turn: Turn, state: State) -> str:
+    """A bot's move with its effect spelled out, so shared-pole events stand out."""
+    action, player = turn.action, turn.player
+    if action.verb == "skip":
+        return "skip"
+    text = _fmt(action)
+    if not turn.outcome.legal:
+        return f"{text} → illegal: {turn.outcome.reason}. Turn wasted."
+    shared = action.pole == 2
+    if action.verb == "lift":
+        held = state.hands[player]
+        where = "from the shared pole" if shared else f"from pole {action.pole}"
+        return f"{text} → took disk {held} {where}"
+    disk = state.poles[pole_key(player, action.pole)][-1]  # type: ignore[arg-type]
+    where = "on the shared pole" if shared else f"on pole {action.pole}"
+    return f"{text} → put disk {disk} {where}"
 
 
 def _fmt(action: Action) -> str:

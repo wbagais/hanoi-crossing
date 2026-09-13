@@ -261,3 +261,13 @@ makes the decision. The README's design section is a summary of this log.
   printed before the final board for every command; `--no-trace` hides it.
   `--trace` is still accepted as a no-op so old invocations keep working.
 - **Rejected:** keeping the trace opt-in (the default output hid the game).
+
+### D39. Bot turns spell out their effect
+- **Context:** a human placed a disk on the shared pole and "did not see it" on the
+  next turn: the random opponent had lifted it, and the one-line bot message
+  `lift 2` did not make that obvious.
+- **Choice:** bot turn lines describe the effect, e.g.
+  `Turn 4, player B: lift 2 → took disk 1 from the shared pole`, and name the
+  shared pole explicitly for both lifts and places.
+- **Rejected:** redrawing the human's view after every bot turn (noisy for long
+  random stretches).
