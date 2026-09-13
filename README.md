@@ -143,7 +143,9 @@ Turn 4, player B                     hand: 2
 ## Design
 
 Every decision, with its reason and the alternatives rejected, is numbered in
-[`docs/DECISIONS.md`](docs/DECISIONS.md). The short version:
+[`docs/DECISIONS.md`](docs/DECISIONS.md); its index marks where each one came
+from: 🟦 required by the spec, 🟨 our reading of a silent rule, ⬜ our engineering
+choice, 🟩 an addition beyond the spec. The short version:
 
 ### Interpretations
 

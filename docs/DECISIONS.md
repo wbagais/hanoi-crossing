@@ -12,59 +12,59 @@ Each entry has the same four parts: **Context** (what raised the question),
 
 | Origin | Meaning |
 |---|---|
-| spec (ID) | the spec requires it; the entry decides *how* (IDs from `docs/REQUIREMENTS.md`) |
-| interpretation (I#) | the spec is silent on a rule; we decided |
-| ours | an engineering choice within the required scope |
-| addition (A#) | a feature beyond the spec, listed in `docs/REQUIREMENTS.md` |
+| 🟦 spec (ID) | the spec requires it; the entry decides *how* (IDs from `docs/REQUIREMENTS.md`) |
+| 🟨 interpretation (I#) | the spec is silent on a rule; we decided |
+| ⬜ ours | an engineering choice within the required scope |
+| 🟩 addition (A#) | a feature beyond the spec, listed in `docs/REQUIREMENTS.md` |
 
 ## Index
 
 | # | Decision | Topic | Origin | Status |
 |---|---|---|---|---|
-| D1 | Rule interpretations I1–I7 | Rules | interpretation (I1–I7) | active |
-| D8 | Three end states | Rules | interpretation (I5) | active |
-| D43 | Random players never make illegal moves | Rules | spec (T3) | active |
-| D2 | Pure functions over an immutable state | Engine | spec (T5, T6) | active |
-| D3 | Disks are plain integers; no ownership after setup | Engine | interpretation (I7) | active |
-| D4 | Fixed action space of seven, player-relative | Engine | spec (R3, T5) | active |
-| D22 | `State` hashes by content despite dict fields | Engine | ours | active |
-| D23 | `_validate` raises, `_illegal_reason` explains | Engine | interpretation (I3) | active |
-| D24 | `bool` is not an int | Engine | ours | active |
-| D25 | Engine size | Engine | spec (C1) | active |
-| D5 | Agent contract | Agents and runner | spec (T8) | active |
-| D6 | One runner | Agents and runner | ours | active |
-| D9 | External agent with timeout, fallback, move source | Agents and runner | addition (A1, A2) | active |
-| D26 | Agents carry `kind` and `last_fell_back` | Agents and runner | addition (A2) | active |
-| D27 | The injected `ask` owns the waiting | Agents and runner | addition (A1) | active |
-| D28 | Stalemate counts (state, player) pairs | Agents and runner | interpretation (I5) | active |
-| D29 | Status checked before each entry and after the loop | Agents and runner | ours | active |
-| D32 | `run` gains `on_turn` | Agents and runner | addition (A1) | active |
-| D44 | Ending a game early (`StopGame`) | Agents and runner | addition (A1) | active |
-| D7 | Recording format | Recording | spec (T2, T9) | active |
-| D30 | Validation in `Recording.__post_init__` | Recording | ours | active |
-| D31 | `replay` is `run` with scripted agents | Recording | spec (T2) | active |
-| D18 | Autosave | Recording | addition (A3) | active |
-| D35 | Continuation recordings are the whole game | Recording | addition (A3, A4) | active |
-| D36 | `hanoi recordings` replays each file | Recording | addition (A3) | active |
-| D12 | CLI shape | CLI | spec (T2, T3) | active |
-| D13 | Schedule flags | CLI | spec (R10) | active |
-| D14 | Seed default 0 | CLI | ours | active |
-| D15 | Repetition limit default 10 | CLI | interpretation (I5) | superseded by D42 |
-| D16 | Move timeout default 30 s | CLI | addition (A1) | active |
-| D33 | Stdin timeout via reader thread | CLI | addition (A1) | active |
-| D34 | End of input counts as no answer | CLI | addition (A1) | active |
-| D41 | `--max-turns` defaults to 200 · 3ⁿ | CLI | ours | active |
-| D42 | Repetition limit off by default | CLI | interpretation (I5) | active |
-| D17 | Drawn towers by default | Output | spec (T9) | active |
-| D38 | Full game trace by default | Output | ours | superseded by D40 |
-| D39 | Bot turns spell out their effect | Output | addition (A5) | active |
-| D40 | Default output is the final state only | Output | ours | active |
-| D10 | Tooling | Process | spec (C2) | active |
-| D11 | TDD visible in git | Process | spec (S1) | active |
-| D21 | Where the documents live | Documentation | spec (T11) | active |
-| D37 | README structure | Documentation | spec (T11) | active |
-| D19 | Interfaces and their purposes | Scope | spec (T5, T6) | active |
-| D20 | Scope beyond the spec | Scope | spec (S3) | active |
+| D1 | Rule interpretations I1–I7 | Rules | 🟨 interpretation (I1–I7) | active |
+| D8 | Three end states | Rules | 🟨 interpretation (I5) | active |
+| D43 | Random players never make illegal moves | Rules | 🟦 spec (T3) | active |
+| D2 | Pure functions over an immutable state | Engine | 🟦 spec (T5, T6) | active |
+| D3 | Disks are plain integers; no ownership after setup | Engine | 🟨 interpretation (I7) | active |
+| D4 | Fixed action space of seven, player-relative | Engine | 🟦 spec (R3, T5) | active |
+| D22 | `State` hashes by content despite dict fields | Engine | ⬜ ours | active |
+| D23 | `_validate` raises, `_illegal_reason` explains | Engine | 🟨 interpretation (I3) | active |
+| D24 | `bool` is not an int | Engine | ⬜ ours | active |
+| D25 | Engine size | Engine | 🟦 spec (C1) | active |
+| D5 | Agent contract | Agents and runner | 🟦 spec (T8) | active |
+| D6 | One runner | Agents and runner | ⬜ ours | active |
+| D9 | External agent with timeout, fallback, move source | Agents and runner | 🟩 addition (A1, A2) | active |
+| D26 | Agents carry `kind` and `last_fell_back` | Agents and runner | 🟩 addition (A2) | active |
+| D27 | The injected `ask` owns the waiting | Agents and runner | 🟩 addition (A1) | active |
+| D28 | Stalemate counts (state, player) pairs | Agents and runner | 🟨 interpretation (I5) | active |
+| D29 | Status checked before each entry and after the loop | Agents and runner | ⬜ ours | active |
+| D32 | `run` gains `on_turn` | Agents and runner | 🟩 addition (A1) | active |
+| D44 | Ending a game early (`StopGame`) | Agents and runner | 🟩 addition (A1) | active |
+| D7 | Recording format | Recording | 🟦 spec (T2, T9) | active |
+| D30 | Validation in `Recording.__post_init__` | Recording | ⬜ ours | active |
+| D31 | `replay` is `run` with scripted agents | Recording | 🟦 spec (T2) | active |
+| D18 | Autosave | Recording | 🟩 addition (A3) | active |
+| D35 | Continuation recordings are the whole game | Recording | 🟩 addition (A3, A4) | active |
+| D36 | `hanoi recordings` replays each file | Recording | 🟩 addition (A3) | active |
+| D12 | CLI shape | CLI | 🟦 spec (T2, T3) | active |
+| D13 | Schedule flags | CLI | 🟦 spec (R10) | active |
+| D14 | Seed default 0 | CLI | ⬜ ours | active |
+| D15 | Repetition limit default 10 | CLI | 🟨 interpretation (I5) | superseded by D42 |
+| D16 | Move timeout default 30 s | CLI | 🟩 addition (A1) | active |
+| D33 | Stdin timeout via reader thread | CLI | 🟩 addition (A1) | active |
+| D34 | End of input counts as no answer | CLI | 🟩 addition (A1) | active |
+| D41 | `--max-turns` defaults to 200 · 3ⁿ | CLI | ⬜ ours | active |
+| D42 | Repetition limit off by default | CLI | 🟨 interpretation (I5) | active |
+| D17 | Drawn towers by default | Output | 🟦 spec (T9) | active |
+| D38 | Full game trace by default | Output | ⬜ ours | superseded by D40 |
+| D39 | Bot turns spell out their effect | Output | 🟩 addition (A5) | active |
+| D40 | Default output is the final state only | Output | ⬜ ours | active |
+| D10 | Tooling | Process | 🟦 spec (C2) | active |
+| D11 | TDD visible in git | Process | 🟦 spec (S1) | active |
+| D21 | Where the documents live | Documentation | 🟦 spec (T11) | active |
+| D37 | README structure | Documentation | 🟦 spec (T11) | active |
+| D19 | Interfaces and their purposes | Scope | 🟦 spec (T5, T6) | active |
+| D20 | Scope beyond the spec | Scope | 🟦 spec (S3) | active |
 
 ## Rules
 
