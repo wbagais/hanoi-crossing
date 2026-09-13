@@ -240,3 +240,14 @@ makes the decision. The README's design section is a summary of this log.
 - **Choice:** the listing shows n, seed (parsed from the file name), turns,
   status, winner, and modification time. Status comes from a real replay.
 - **Reason:** files are small and replay is instant; a stored status could lie.
+
+## Stage 4
+
+### D37. README structure
+- **Choice:** the README summarizes this log and `docs/REQUIREMENTS.md` rather
+  than repeating them: game, interpretations, design per module, frontends, reuse
+  (with an RL wrapper sketch that is explicitly not shipped), additions, rejected
+  alternatives, future work, layout, AI usage, journey.
+- **Reason:** a reviewer reads the README first; the detail is one link away.
+- **Rejected:** copying the decision log into the README (too long); a separate
+  ARCHITECTURE.md (the README's design section is short enough).

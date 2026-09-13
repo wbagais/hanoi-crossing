@@ -133,37 +133,37 @@ and reports it; Choose invokes the fallback and labels the source `timeout`.
 
 ## 5. Requirements traceability
 
-| ID | Requirement | Stage |
-|---|---|---|
-| R1 | Two players, 3 poles each, N disks on pole 1, largest at bottom | 1 |
-| R2 | Pole 2 shared, both can interact | 1 |
-| R3 | Opponent's poles 1, 3 and hand are hidden | 1 `observe`; 2 agents see only `Observation` |
-| R4 | A odd sizes, B even sizes | 1 |
-| R5 | Place only on empty pole or strictly larger disk | 1 |
-| R6 | Exactly one action per turn: lift, place, skip | 1, 2 |
-| R7 | At most one disk in hand | 1 |
-| R8 | Either player may lift any top disk from pole 2 | 1 |
-| R9 | Illegal action changes nothing, turn wasted | 1 `step`; 2 runner records it |
-| R10 | Turn order external, no pattern assumed | 1; 2 schedules |
-| R11 | Win condition | 1 `winner` |
-| R12 | Pole naming 1a, 2, 3a, 1b, 3b | 1; 3 render |
-| R13 | N=1 example plays as written | 1, 2, 3 |
-| T1 | Engine in Python | 1 |
-| T2 | Replay CLI: moves + turn order in, final state out | 2, 3 |
-| T3 | Random-play mode | 2, 3 |
-| T4 | Tests exercise the engine directly | 1 |
-| T5 | Reusable as RL environment core, unchanged | 1; 4 README |
-| T6 | Reusable as concurrent-service core, unchanged | 1; 4 README |
-| T7 | Do not build RL or service | all; §7 |
-| T8 | Random player consumes engine as an external agent would | 2 |
-| T9 | Design input, output, internal model | 1, 2, 3 |
-| T10 | Decide and document open rules | 1; 4 |
-| T11 | README with design decisions | 0; 4 |
-| C1 | Engine under 500 lines | 1 |
-| C2 | Standard layout, uv | 0 |
-| S1 | Git repo, journey visible | 0; all |
-| S2 | Disclose AI usage | 0; all; 4 |
-| S3 | ~2 h, WIP OK | stages 0–3 are a complete submission |
+| ID | Requirement | Stage | Done |
+|---|---|---|---|
+| R1 | Two players, 3 poles each, N disks on pole 1, largest at bottom | 1 | ✓ engine tests: initial layouts |
+| R2 | Pole 2 shared, both can interact | 1 | ✓ engine test: lift opponent's disk from pole 2 |
+| R3 | Opponent's poles 1, 3 and hand are hidden | 1 `observe`; 2 agents see only `Observation` | ✓ engine test: observe hides opponent; agents tests |
+| R4 | A odd sizes, B even sizes | 1 | ✓ engine tests: initial layouts |
+| R5 | Place only on empty pole or strictly larger disk | 1 | ✓ engine tests: size-rule reasons |
+| R6 | Exactly one action per turn: lift, place, skip | 1, 2 | ✓ engine legal_actions; runner one action per entry |
+| R7 | At most one disk in hand | 1 | ✓ engine test: hand is not empty |
+| R8 | Either player may lift any top disk from pole 2 | 1 | ✓ engine test: either player lifts from pole 2 |
+| R9 | Illegal action changes nothing, turn wasted | 1 `step`; 2 runner records it | ✓ engine test: identical object on illegal; runner records wasted turns |
+| R10 | Turn order external, no pattern assumed | 1; 2 schedules | ✓ engine solo-solve test; runner schedules |
+| R11 | Win condition | 1 `winner` | ✓ engine winner tests |
+| R12 | Pole naming 1a, 2, 3a, 1b, 3b | 1; 3 render | ✓ engine pole keys; render board tests |
+| R13 | N=1 example plays as written | 1, 2, 3 | ✓ spec_n1.json in engine, runner, recording, CLI tests |
+| T1 | Engine in Python | 1 | ✓ engine.py |
+| T2 | Replay CLI: moves + turn order in, final state out | 2, 3 | ✓ hanoi replay; recording.replay |
+| T3 | Random-play mode | 2, 3 | ✓ hanoi random; RandomAgent |
+| T4 | Tests exercise the engine directly | 1 | ✓ tests/test_engine.py, 65 tests |
+| T5 | Reusable as RL environment core, unchanged | 1; 4 README | ✓ README Reuse; observe / ALL_ACTIONS / no clock |
+| T6 | Reusable as concurrent-service core, unchanged | 1; 4 README | ✓ README Reuse; immutable hashable State, to_dict |
+| T7 | Do not build RL or service | all; §7 | ✓ nothing built; README Future work |
+| T8 | Random player consumes engine as an external agent would | 2 | ✓ agents.Agent protocol; test never receives a State |
+| T9 | Design input, output, internal model | 1, 2, 3 | ✓ engine model, recording format, render output |
+| T10 | Decide and document open rules | 1; 4 | ✓ docs/REQUIREMENTS.md I1–I7; engine docstring |
+| T11 | README with design decisions | 0; 4 | ✓ README |
+| C1 | Engine under 500 lines | 1 | ✓ 267 lines; test guards < 500 |
+| C2 | Standard layout, uv | 0 | ✓ uv, src layout |
+| S1 | Git repo, journey visible | 0; all | ✓ 25+ commits, red/green pairs |
+| S2 | Disclose AI usage | 0; all; 4 | ✓ README AI usage; docs/DECISIONS.md |
+| S3 | ~2 h, WIP OK | stages 0–3 are a complete submission | ✓ stages 0–3 complete; stage 4 docs |
 
 ## 6. Stages
 
@@ -420,7 +420,7 @@ terminal; stage 3 marked done.
 
 ### Stage 4 — Write-up
 
-**Status:** todo
+**Status:** done
 
 **Goal.** The README the spec asks for, built from `docs/DECISIONS.md` and
 `docs/REQUIREMENTS.md`.
