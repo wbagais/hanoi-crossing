@@ -68,8 +68,8 @@ def build_parser() -> argparse.ArgumentParser:
     game.add_argument(
         "--repetition-limit",
         type=int,
-        default=10,
-        help="stalemate after K repeats of a position; 0 disables (default 10)",
+        default=0,
+        help="end as stalemate after K repeats of a position; 0 = off (default)",
     )
 
     fresh = argparse.ArgumentParser(add_help=False)

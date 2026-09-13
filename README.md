@@ -178,7 +178,8 @@ Shared flags: `--seed` (default 0, so runs are reproducible; pass another number
 different game), `--json`, `--list`, `--trace`. Game flags: `--first A|B`,
 `--schedule AB` (any pattern of A and B, repeated), `--max-turns` (default
 200 × 3ⁿ, which random players need; see D41),
-`--repetition-limit 10` (stalemate detection, `0` disables), `--no-skip`,
+`--repetition-limit K` (stalemate after K repeats of a position; off by default,
+see D42), `--no-skip`,
 `--save FILE`, `--no-save`. Every finished game is autosaved once, at the end.
 Exit codes: 0 ok, 1 bad recording, 2 bad arguments.
 
@@ -236,8 +237,8 @@ One line each; the full reasoning is in the decision log.
   fixed opponent).
 - A player-tagged list of steps as the recording format: turn order becomes implicit.
 - Starter chosen by the seed: surprising; `--first` rotates the pattern instead.
-- Repetition limit 3 as in chess: random agents revisit positions so often that most
-  random games would end as stalemates; default is 10.
+- A repetition limit on by default: random walkers on a finite board always repeat
+  positions eventually, so large random games ended as stalemates; it is now opt-in.
 - Writing the recording after every turn: unnecessary; once at the end is enough.
 - Poetry, Docker, HTML docs, a pytest pre-commit hook: see D10.
 

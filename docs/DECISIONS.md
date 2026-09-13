@@ -290,3 +290,16 @@ makes the decision. The README's design section is a summary of this log.
   default for continuing an unfinished replay.
 - **Rejected:** a flat number (wrong for every n but one); 4ⁿ (grows faster than
   the data and makes large n slow for no benefit).
+
+### D42. Repetition limit is off by default (reverses D15)
+- **Context:** with `--max-turns` scaled to n (D41), every ten-disk random game
+  ended as `stalemate`: random walkers on a finite board are guaranteed to revisit
+  positions, and near the start each player has only two legal moves, so the
+  initial position recurs within a few dozen turns.
+- **Choice:** `--repetition-limit` defaults to 0 (off) on every command. Stalemate
+  detection is opt-in for games where players may deliberately stall.
+- **Reason:** a repeated position is only a stalemate when players *choose* to
+  repeat; random agents never do, and a human who stalls is covered by the move
+  timeout.
+- **Rejected:** 10 by default (D15); off for random only (two defaults for one
+  flag is confusing).

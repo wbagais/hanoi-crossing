@@ -343,7 +343,7 @@ and stdin is a TTY: `Game unfinished. Let random players finish it? [y/N]`.
 | `--continue` / `--no-continue` | optional | ask if TTY, else no | Pre-answer the prompt. |
 | `--schedule P` | optional | `AB` | Continuation pattern, from the player after the last recorded turn. |
 | `--max-turns N` | optional | `200 · 3^n` | Continuation length (D41). |
-| `--repetition-limit K` | optional | `10` | Stalemate detection; `0` disables. |
+| `--repetition-limit K` | optional | off | Stalemate detection when given (D42). |
 
 `hanoi random --n N` — both players random; same as `play --a random --b random`.
 
@@ -353,7 +353,7 @@ and stdin is a TTY: `Game unfinished. Let random players finish it? [y/N]`.
 | `--first A\|B` | optional | `A` | Who takes turn 1; rotates the pattern to that player's first occurrence (`AAB` → `BAA`). Error if absent from the pattern. |
 | `--schedule P` | optional | `AB` | Pattern repeated to fill `--max-turns`; A/B only; printed before turn 1. |
 | `--max-turns N` | optional | `200 · 3^n` | Schedule length; reaching it ends `unfinished` (D41). |
-| `--repetition-limit K` | optional | `10` | `stalemate` when a position with the same player to move recurs K times; `0` disables (10 not 3: random agents revisit positions often). |
+| `--repetition-limit K` | optional | off | `stalemate` when a position with the same player to move recurs K times; off unless given (D42). |
 | `--no-skip` | optional | off | Random agents skip only when nothing else is legal. |
 | `--save FILE` | optional | autosave `recordings/<date>-<mode>-n<N>-seed<S>.json` | Every finished game (any status) is written once at the end; path printed. `--save` names it. |
 | `--no-save` | optional | off | Write nothing. |
