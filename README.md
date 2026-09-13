@@ -160,7 +160,30 @@ B> place 2
 ```
 
 The final board shows both sides, then a summary:
-`status won · winner A · played 44 · illegal 2 · skipped 6 · timeouts 0 · unplayed 0`.
+`status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0`.
+
+With `--list` the same final position is the spec's cross layout, poles as
+bracket lists bottom to top (this is `examples/n3_blocked_win.json`; A won with
+B's disk 6 still in B's hand):
+
+```
+                 1a: []
+                  |
+  1b: [4, 2] --- [2]: [] --- 3b: []
+                  |
+                 3a: [5, 3, 1]
+  hand A: -   hand B: 6
+
+status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0
+```
+
+A human turn in list style is three lines:
+
+```
+Turn 4, player B                     hand: 2
+  pole 1: [4]   pole 2: [1]   pole 3: []
+  legal: place 1, place 3, skip
+```
 
 ## Frontends
 
