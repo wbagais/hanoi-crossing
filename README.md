@@ -14,7 +14,7 @@ under [Future work](#future-work) and deliberately not built.
 uv sync
 uv run pytest                                  # 172 tests
 uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
-uv run hanoi random --n 3 --seed 7             # two random players
+uv run hanoi random --n 3 --seed 7 --trace     # two random players, every turn shown
 uv run hanoi play --a human --b random --n 2   # you against a random player
 uv run hanoi recordings                        # games saved so far
 ```
@@ -139,9 +139,9 @@ restarts from the initial position; the file stores moves, never board states.
 
 ### Output formats
 
-Every finished game prints the full turn-by-turn trace, one line per turn with its
-source, then the final board. Drawn towers by default; `--list` for bracket lists in
-the spec's cross layout; `--json` for machines; `--no-trace` to skip the trace. A
+By default a finished game prints the final board and a summary. `--trace` adds
+the full game first, one line per turn with its source. Drawn towers by default;
+`--list` for bracket lists in the spec's cross layout; `--json` for machines. A
 human turn:
 
 ```
@@ -175,7 +175,7 @@ per player, then hand those to the single runner.
 | `hanoi recordings` | lists games autosaved to `recordings/` |
 
 Shared flags: `--seed` (default 0, so runs are reproducible; pass another number for a
-different game), `--json`, `--list`, `--no-trace`. Game flags: `--first A|B`,
+different game), `--json`, `--list`, `--trace`. Game flags: `--first A|B`,
 `--schedule AB` (any pattern of A and B, repeated), `--max-turns 1000`,
 `--repetition-limit 10` (stalemate detection, `0` disables), `--no-skip`,
 `--save FILE`, `--no-save`. Every finished game is autosaved once, at the end.

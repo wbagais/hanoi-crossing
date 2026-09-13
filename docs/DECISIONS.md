@@ -271,3 +271,10 @@ makes the decision. The README's design section is a summary of this log.
   shared pole explicitly for both lifts and places.
 - **Rejected:** redrawing the human's view after every bot turn (noisy for long
   random stretches).
+
+### D40. Default output is the final state only (reverses D38)
+- **Context:** after trying a 44-turn replay, the full trace by default was too
+  much; during human play every turn is already printed live.
+- **Choice:** default prints the final board and summary; `--trace` adds the full
+  game. `--no-trace` is removed.
+- **Rejected:** trace by default (D38).
