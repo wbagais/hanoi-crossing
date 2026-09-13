@@ -143,3 +143,94 @@ def observe(state: State, player: Player) -> Observation:
         },
         hand=state.hands[player],
     )
+
+
+def winner(state: State) -> Player | None:
+    """The player who has won, if any (R11, I1). Checked A then B.
+
+    A player wins when their hand is empty, their pole 1 and the shared pole are
+    empty, and their pole 3 holds at least one disk. At most one player can
+    satisfy this in any reachable state, so the first match is the winner.
+    """
+    for p in PLAYERS:
+        if (
+            state.hands[p] is None
+            and not state.poles[pole_key(p, 1)]
+            and not state.poles[SHARED]
+            and state.poles[pole_key(p, 3)]
+        ):
+            return p
+    return None
+
+
+def _validate(player: object, action: object) -> None:
+    """Raise ValueError for input that is not even a well-formed move (I3)."""
+    _require_player(player)
+    if not isinstance(action, Action):
+        raise ValueError(f"action must be an Action, got {action!r}")
+    if action.verb == "skip":
+        if action.pole is not None:
+            raise ValueError("skip takes no pole")
+    elif action.verb in ("lift", "place"):
+        if action.pole not in (1, 2, 3):
+            raise ValueError(f"pole must be 1, 2 or 3, got {action.pole!r}")
+    else:
+        raise ValueError(f"unknown verb {action.verb!r}")
+
+
+def _illegal_reason(state: State, player: Player, action: Action) -> str | None:
+    """Why a well-formed action is illegal in this position, or None if legal."""
+    if action.verb == "skip":
+        return None
+    key = pole_key(player, action.pole)  # type: ignore[arg-type]
+    held = state.hands[player]
+    if action.verb == "lift":
+        if held is not None:
+            return "hand is not empty"
+        if not state.poles[key]:
+            return f"pole {action.pole} is empty"
+        return None
+    if held is None:
+        return "hand is empty"
+    pole = state.poles[key]
+    if pole and pole[-1] < held:
+        return f"disk {held} cannot go on disk {pole[-1]}"
+    return None
+
+
+def legal_actions(state: State, player: Player) -> list[Action]:
+    """Actions ``step`` would accept now, in ALL_ACTIONS order. Empty once the game is over."""
+    _require_player(player)
+    if winner(state) is not None:
+        return []
+    return [a for a in ALL_ACTIONS if _illegal_reason(state, player, a) is None]
+
+
+def step(state: State, player: Player, action: Action) -> tuple[State, Outcome]:
+    """Apply one action for ``player``.
+
+    Order of checks: game already over -> malformed input -> illegal here ->
+    apply -> check both players for a win. An illegal action returns the very
+    same ``state`` object so the caller can detect a wasted turn cheaply (R9).
+    """
+    _validate(player, action)
+    already = winner(state)
+    if already is not None:
+        return state, Outcome(False, "game is over", already, True)
+    reason = _illegal_reason(state, player, action)
+    if reason is not None:
+        return state, Outcome(False, reason, None, False)
+    if action.verb == "skip":
+        return state, Outcome(True, None, None, False)
+    key = pole_key(player, action.pole)  # type: ignore[arg-type]
+    poles = dict(state.poles)
+    hands = dict(state.hands)
+    if action.verb == "lift":
+        hands[player] = poles[key][-1]
+        poles[key] = poles[key][:-1]
+    else:
+        poles[key] = poles[key] + (hands[player],)  # type: ignore[operator]
+        hands[player] = None
+    new = State(n=state.n, poles=poles, hands=hands)
+    won = winner(new)
+    return new, Outcome(True, None, won, won is not None)
