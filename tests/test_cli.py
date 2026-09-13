@@ -270,3 +270,22 @@ def test_bot_turn_lines_explain_shared_pole_effects() -> None:
     )
     assert "Turn 4, player B: lift 2 → took disk 1 from the shared pole" in out
     assert "Turn 2, player B: skip" in out
+
+
+# --- max-turns default scales with n ------------------------------------------------------
+
+
+def test_default_max_turns_is_200_times_3_to_the_n() -> None:
+    assert cli.default_max_turns(1) == 600
+    assert cli.default_max_turns(4) == 16200
+    _, out = run_cli("random", "--n", "2", "--seed", "0", "--no-save")
+    assert "max 1800 turns" in out
+    _, out = run_cli("random", "--n", "2", "--seed", "0", "--no-save", "--max-turns", "7")
+    assert "max 7 turns" in out
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
+def test_random_games_finish_within_the_default_cap(n: int) -> None:
+    for seed in range(3):
+        _, out = run_cli("random", "--n", str(n), "--seed", str(seed), "--no-save", "--json")
+        assert json.loads(out)["status"] == "won"
