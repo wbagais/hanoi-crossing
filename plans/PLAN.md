@@ -56,17 +56,24 @@ flowchart LR
     cli --> runner[runner.py]
     cli --> recording[recording.py]
     cli --> agents[agents.py]
-    runner --> engine[engine.py]
-    runner --> agents
-    recording --> agents
+    cli --> engine[engine.py]
     render --> engine
+    render -. format_action .-> recording
+    render -. RunResult, Turn types .-> runner
+    recording --> runner
+    recording --> agents
+    recording --> engine
+    runner --> engine
+    runner --> agents
     agents -. Observation, Action types only .-> engine
 ```
 
-Arrows mean "imports and calls". `render` uses `engine` only for its data types
-(`State`, `Observation`) to draw them; it never calls `step`. `recording` uses
-`agents` only to wrap loaded moves as scripted agents. Replay is not a separate
-code path: it is the same loop with both agents scripted from the file.
+Arrows mean "imports and calls"; dotted arrows import types or one helper only.
+`render` re-steps recorded turns through the engine to describe them, and reads
+`format_action` from `recording`. `recording` calls `runner.run` for `replay` and
+wraps loaded moves as scripted agents. `cli` reaches the engine directly for
+`initial_state`, `to_dict`, and the pole mapping. Replay is not a separate code
+path: it is the same loop with both agents scripted from the file.
 
 Engine holds nothing between calls and never sees where a move came from. Agents
 receive only an `Observation` and the legal actions. The runner owns the loop and
@@ -105,6 +112,7 @@ flowchart TD
     P4H -- "towers, hand, legal list, countdown" --> H[Human]
     H -- "typed move within timeout, source = human" --> P4
     P4H -- "no answer in time" --> P4
+    P4H -- "quit, Ctrl-C, or the K-th unanswered prompt in a row: StopGame" --> X3
     P4 -. "on no answer: ask fallback" .-> P4R((Random fallback))
     P4R -- "random legal action, source = timeout" --> P4
     R[Random generator, seeded] -. "random: uniform pick from the legal list" .-> P4
@@ -114,12 +122,16 @@ flowchart TD
     C3 -- "yes: apply, new state, check both players for a win" --> P6((Record))
     C3 -- "no: turn wasted, state unchanged, reason" --> P6
     P6 -- "append turn: action, outcome, source" --> D1[("Turn log<br/>this game, in memory")]
+    P6 -- "on_turn: live line for human games" --> T[Terminal]
     P6 -- "next schedule entry" --> P2
 ```
 
 Observe runs on every turn for every agent kind. Unparseable typed text is
 re-prompted at no cost (inside Show view and prompt). The prompt detects a timeout
-and reports it; Choose invokes the fallback and labels the source `timeout`.
+and reports it; Choose invokes the fallback and labels the source `timeout`. The
+prompt raises `StopGame` on `quit`, Ctrl-C, or the K-th unanswered prompt in a row;
+`run` catches it and returns the game so far as `unfinished` (D44). `on_turn` is
+how the CLI prints live during human play without owning a second loop (D32).
 
 ### 3.3 Play paths (all implemented, all through the same loop)
 
