@@ -32,7 +32,7 @@ from .render import (
     render_trace,
     render_view,
 )
-from .runner import RunResult, Turn, repeat, rotate_to, run
+from .runner import RunResult, StopGame, Turn, repeat, rotate_to, run
 
 EXIT_OK, EXIT_BAD_FILE, EXIT_BAD_ARGS = 0, 1, 2
 
@@ -96,6 +96,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_play.add_argument(
         "--move-timeout", type=float, default=30, help="seconds per human move; 0 disables"
     )
+    p_play.add_argument(
+        "--max-timeouts",
+        type=int,
+        default=3,
+        help="end the game after this many unanswered prompts in a row; 0 = never (default 3)",
+    )
 
     p_rec = sub.add_parser("recordings", parents=[common], help="list saved games")
     p_rec.add_argument("--dir", default="recordings")
@@ -137,8 +143,15 @@ class LineReader:
 
 @dataclass
 class Session:
+    """``out`` carries the result (text or JSON); ``chat`` carries interaction.
+
+    Without ``--json`` both are stdout. With ``--json`` the interaction (views,
+    prompts, per-turn lines) moves to stderr so stdout is exactly one JSON object.
+    """
+
     args: argparse.Namespace
     out: IO[str]
+    chat: IO[str]
     reader: LineReader
     isatty: bool
     turn_count: int = 0
@@ -148,21 +161,35 @@ class Session:
         return "list" if self.args.list else "tower"
 
     def say(self, text: str = "") -> None:
-        if not self.args.json:
-            self.out.write(text + "\n")
+        self.chat.write(text + "\n")
 
     def human(self, player: str, n: int, rng: random.Random) -> ExternalAgent:
         timeout = self.args.move_timeout or None
-        prompt = _Prompt(self, player, n, timeout)
+        prompt = _Prompt(self, player, n, timeout, getattr(self.args, "max_timeouts", 3))
         return ExternalAgent(prompt, timeout=timeout, fallback=RandomAgent(rng))
 
 
 class _Prompt:
-    """The injected ``ask``: show the view, read a move, re-prompt on garbage."""
+    """The injected ``ask``: show the view, read a move, re-prompt on garbage.
 
-    def __init__(self, session: Session, player: str, n: int, timeout: float | None) -> None:
+    Ends the game (``StopGame``) on ``quit``, on Ctrl-C, or after ``max_timeouts``
+    unanswered prompts in a row, so an absent human never leaves the game playing
+    itself for hours.
+    """
+
+    QUIT_WORDS = ("quit", "q", "exit")
+
+    def __init__(
+        self, session: Session, player: str, n: int, timeout: float | None, max_timeouts: int
+    ) -> None:
         self.s, self.player, self.n, self.timeout = session, player, n, timeout
+        self.max_timeouts = max_timeouts
         self.last_hand: int | None = None
+        self.unanswered = 0
+
+    def _end(self, reason: str) -> None:
+        self.s.say(f"  game ended: {reason}")
+        raise StopGame(reason)
 
     def __call__(
         self, observation: Observation, legal: Sequence[Action], timeout: float | None
@@ -170,26 +197,41 @@ class _Prompt:
         self.last_hand = observation.hand
         index = self.s.turn_count + 1
         self.s.say()
-        self.s.say(
-            render_view(observation, self.player, index, self.n, legal, self.s.style, timeout)
-        )
+        view = render_view(observation, self.player, index, self.n, legal, self.s.style, timeout)
+        self.s.say(view)
         deadline = None if timeout is None else time.monotonic() + timeout
         while True:
-            self.s.out.write(f"{self.player}> ")
-            self.s.out.flush()
+            self.s.chat.write(f"{self.player}> ")
+            self.s.chat.flush()
             remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
             try:
                 line = self.s.reader.get(remaining)
             except Timeout:
                 self.s.say()
+                self._unanswered()
                 raise
+            except KeyboardInterrupt:
+                self.s.say()
+                self._end("interrupted")
             if line is None:
                 self.s.say()
+                self._unanswered()
                 return None
+            text = line.strip().lower()
+            if text in self.QUIT_WORDS:
+                self._end(f"player {self.player} quit")
             try:
-                return parse_action(line.strip())
+                action = parse_action(text)
             except RecordingFormatError:
                 self.s.say(f"  {PROMPT_HELP}")
+                continue
+            self.unanswered = 0
+            return action
+
+    def _unanswered(self) -> None:
+        self.unanswered += 1
+        if self.max_timeouts and self.unanswered >= self.max_timeouts:
+            self._end(f"player {self.player} did not answer {self.unanswered} prompts in a row")
 
 
 def _on_turn_factory(session: Session, agents: dict[str, Agent], prompts: dict[str, _Prompt]):
@@ -265,15 +307,13 @@ def _emit(
         }
         session.out.write(json.dumps(payload, indent=2) + "\n")
         return
+    write = session.out.write
     if session.args.trace and result.turns:
-        session.say()
-        session.say(render_trace(result.turns, start=start))
-    session.say()
-    session.say(render_board(result.final_state, session.style))
-    session.say()
-    session.say(render_summary(result))
+        write("\n" + render_trace(result.turns, start=start) + "\n")
+    write("\n" + render_board(result.final_state, session.style) + "\n")
+    write("\n" + render_summary(result) + "\n")
     if saved:
-        session.say(f"saved: {saved}")
+        write(f"saved: {saved}\n")
 
 
 def _autosave(session: Session, rec: Recording, mode: str, seed: int) -> Path | None:
@@ -386,8 +426,8 @@ def _wants_continue(session: Session) -> bool:
         return True
     if args.no_cont or args.json or not session.isatty:
         return False
-    session.out.write("Game unfinished. Let random players finish it? [y/N] ")
-    session.out.flush()
+    session.chat.write("Game unfinished. Let random players finish it? [y/N] ")
+    session.chat.flush()
     try:
         answer = session.reader.get(None)
     except Timeout:
@@ -426,6 +466,7 @@ def main(
     stdin: IO[str] | None = None,
     stdout: IO[str] | None = None,
     isatty: bool | None = None,
+    stderr: IO[str] | None = None,
 ) -> int:
     parser = build_parser()
     try:
@@ -435,7 +476,8 @@ def main(
     stdin = stdin if stdin is not None else sys.stdin
     out = stdout if stdout is not None else sys.stdout
     tty = isatty if isatty is not None else bool(getattr(stdin, "isatty", lambda: False)())
-    session = Session(args, out, LineReader(stdin), tty)
+    chat = (stderr if stderr is not None else sys.stderr) if args.json else out
+    session = Session(args, out, chat, LineReader(stdin), tty)
     try:
         if args.command == "replay":
             return cmd_replay(session)
@@ -447,6 +489,9 @@ def main(
     except ValueError as e:  # bad --schedule / --first combinations
         out.write(f"error: {e}\n")
         return EXIT_BAD_ARGS
+    except KeyboardInterrupt:  # Ctrl-C outside a human prompt: nothing to save
+        out.write("\ninterrupted\n")
+        return 130
 
 
 def entry() -> None:

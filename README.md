@@ -81,6 +81,11 @@ per player, then hand those to the single runner.
 | `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans have `--move-timeout` seconds (default 30) before a random move is played for them |
 | `hanoi recordings` | lists games autosaved to `recordings/` |
 
+To stop a human game early, type `quit` at the prompt or press Ctrl-C; a human who
+ignores three prompts in a row is treated as gone. The game ends as `unfinished`,
+is autosaved, and can be continued later with `replay --continue`. Random players
+never make illegal moves; only humans and recordings can.
+
 Every flag, default, and exit code is in [`docs/USAGE.md`](docs/USAGE.md). The
 essentials: `--seed` (default 0, so runs are reproducible), `--trace` to show every
 turn, `--list` for the compact board, `--json` for machines, `--first` and

@@ -303,3 +303,28 @@ makes the decision. The README's design section is a summary of this log.
   timeout.
 - **Rejected:** 10 by default (D15); off for random only (two defaults for one
   flag is confusing).
+
+### D43. Random players never make illegal moves
+- **Choice:** `RandomAgent` chooses only from `legal_actions`, so every random move
+  is legal by construction; the invariants test asserts it over thousands of turns.
+  Illegal moves can enter a game only from a human or from a recording, and are
+  wasted turns as the rules say.
+- **Reason:** the spec's random mode is "random *valid* moves" (T3). Making the
+  agent sample all seven actions and let the engine reject some would still be a
+  legal implementation, but it would inflate wasted turns for no benefit.
+
+### D44. Ending a game early
+- **Context:** a human who walks away left the game playing itself: every turn
+  waited the full move timeout before the random fallback moved, for up to
+  `--max-turns` turns. There was also no way to quit except Ctrl-C, which threw
+  the game away.
+- **Choice:** `runner.StopGame`: an agent (or the function it asks) may raise it
+  and `run` returns the game so far as `unfinished`, with the remaining schedule
+  counted as unplayed. The CLI raises it on `quit` / `q` / `exit`, on Ctrl-C
+  during a human prompt, and after `--max-timeouts` (default 3) unanswered prompts
+  in a row. The result is rendered and autosaved like any other, so it can be
+  continued with `replay --continue`. Ctrl-C outside a prompt (random mode,
+  replay) exits 130 with nothing saved.
+- **Rejected:** a fourth status `abandoned` (the recording is simply unfinished;
+  the printed reason says why); switching the absent human to a random player for
+  the rest of the game (the game would end without them ever seeing it).

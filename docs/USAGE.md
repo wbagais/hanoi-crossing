@@ -19,6 +19,10 @@ uv run hanoi recordings [--dir DIR]
 | `--list` | optional | off | Show poles as bracket lists in the spec's cross layout instead of drawn towers. |
 | `--trace` | optional | off | Print the full game before the final board: one line per turn, `index player action → result [source]`. |
 | `--seed S` | optional | `0` | Seeds the random players (and the random fallback for humans). Same seed, same game. Pass any other integer for a different game. |
+| `--max-turns N` | optional | `200 · 3ⁿ` | Schedule length; reaching it ends the game as `unfinished`. The default follows measured random play: 600, 1 800, 5 400, 16 200, 48 600 for N = 1..5. For `replay` it is the length of the continuation. |
+| `--repetition-limit K` | optional | off (`0`) | End as `stalemate` when the same position with the same player to move has occurred K times. Off by default because random players revisit positions by chance, not by choice. For `replay` it applies to the continuation. |
+
+`recordings` takes none of the game flags.
 
 ## `hanoi replay FILE`
 
@@ -32,8 +36,6 @@ illegal moves are wasted again, as they were originally.
 | `--continue` | optional | ask | If the recording ends unfinished, let random players finish it without asking. |
 | `--no-continue` | optional | ask | Never continue, never ask. |
 | `--schedule P` | optional | `AB` | Turn-order pattern for the continuation, rotated to start with the player after the last recorded turn. |
-| `--max-turns N` | optional | `200 · 3ⁿ` | Length of the continuation schedule. |
-| `--repetition-limit K` | optional | off | During the continuation, end as `stalemate` when the same position with the same player to move has occurred K times. |
 
 When the recording ends unfinished and stdin is a terminal, replay asks
 `Game unfinished. Let random players finish it? [y/N]`. With `--json`, or when
@@ -50,8 +52,6 @@ command so the spec's mode is visible by name.
 | `--n N` | required | — | Disks per player. A gets sizes 1, 3, …, 2N−1; B gets 2, 4, …, 2N. |
 | `--first A\|B` | optional | `A` | Who takes turn 1. Rotates the schedule pattern to that player's first occurrence: `AB` → `BA`, `AAB` → `BAA`. Error (exit 2) if the pattern has no such player. |
 | `--schedule P` | optional | `AB` | Turn-order pattern, letters A and B only, repeated to fill `--max-turns`. `AAB` gives A two turns then B one; `A` lets A play alone. Printed before turn 1. |
-| `--max-turns N` | optional | `200 · 3ⁿ` | Schedule length. Reaching it ends the game as `unfinished`. The default follows measured random play: 600, 1 800, 5 400, 16 200, 48 600 for N = 1..5. |
-| `--repetition-limit K` | optional | off (`0`) | End as `stalemate` when the same position with the same player to move has occurred K times. Off by default because random players revisit positions by chance, not by choice. |
 | `--no-skip` | optional | off | Random players never choose skip unless it is the only legal action. |
 | `--save FILE` | optional | autosave | Write the recording to `FILE` instead of the autosave name. |
 | `--no-save` | optional | off | Do not write a recording. |
@@ -69,6 +69,7 @@ Any mix of players. Takes every flag of `random` plus:
 | `--a SRC` | required | — | Player A's move source: `random` or `human`. |
 | `--b SRC` | required | — | Player B's move source: `random` or `human`. |
 | `--move-timeout S` | optional | `30` | Seconds a human has to answer the prompt. When it runs out, a random legal move is played for them and the turn is marked `timeout`. `0` disables the limit. |
+| `--max-timeouts K` | optional | `3` | After K unanswered prompts in a row the human is treated as gone and the game ends as `unfinished`. `0` never ends the game this way. |
 
 A human turn prints that player's view only (own poles 1 and 3, the shared pole 2,
 own hand), the legal actions, the remaining seconds, and the prompt `A>` or `B>`.
@@ -78,6 +79,24 @@ wastes the turn, as the rules say. End of input on stdin counts as no answer.
 Opponent turns print one line each, for example
 `Turn 4, player B: lift 2 → took disk 1 from the shared pole`. Two humans on one
 terminal see each other's turns.
+
+### Ending a game early
+
+| How | Effect |
+|---|---|
+| type `quit` (or `q`, `exit`) at the prompt | game ends as `unfinished`, is autosaved, prints `game ended: player A quit` |
+| Ctrl-C during a human turn | same, with `game ended: interrupted` |
+| K unanswered prompts in a row (`--max-timeouts`, default 3) | same, with `game ended: player A did not answer 3 prompts in a row` |
+| Ctrl-C during a random game or replay | exits with code 130; nothing is saved |
+
+An unfinished autosaved game can be picked up later with
+`hanoi replay <file> --continue`.
+
+### Who can make an illegal move
+
+Random players never do: they choose only from the legal actions. Illegal moves
+come from a human typing one, or from a recording that contains one, and are
+replayed as the wasted turns they were.
 
 ## `hanoi recordings`
 

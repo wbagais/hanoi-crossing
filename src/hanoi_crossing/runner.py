@@ -25,6 +25,15 @@ from .engine import PLAYERS, Action, Outcome, Player, State, legal_actions, obse
 Status = Literal["won", "unfinished", "stalemate"]
 
 
+class StopGame(Exception):
+    """Raised from inside an agent (or the function it asks) to end the game now.
+
+    ``run`` catches it and returns the game so far as ``unfinished``, so a quit,
+    an interrupt, or an abandoned human turn still yields a result that can be
+    rendered, saved, and continued later.
+    """
+
+
 @dataclass(frozen=True)
 class Turn:
     """One played turn. ``source`` is the agent kind, or ``timeout`` when a
@@ -108,7 +117,8 @@ def run(
     the remaining entries counted as unplayed; with ``repetition_limit`` set, a
     (state, player-to-move) pair seen that many times ends it as a stalemate.
     ``on_turn`` is called after every played turn with the turn and the new
-    state, so a frontend can print live without owning the loop.
+    state, so a frontend can print live without owning the loop. An agent may
+    raise ``StopGame`` to end the game early; the result is then ``unfinished``.
     """
     turns: list[Turn] = []
     seen: Counter[tuple[State, Player]] = Counter()
@@ -120,7 +130,10 @@ def run(
             seen[(state, player)] += 1
             if seen[(state, player)] >= repetition_limit:
                 return RunResult(state, tuple(turns), "stalemate", None, len(schedule) - i)
-        state, turn = play_turn(state, player, agents[player], i + 1)
+        try:
+            state, turn = play_turn(state, player, agents[player], i + 1)
+        except StopGame:
+            return RunResult(state, tuple(turns), "unfinished", None, len(schedule) - i)
         turns.append(turn)
         if on_turn is not None:
             on_turn(turn, state)
