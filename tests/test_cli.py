@@ -289,3 +289,29 @@ def test_random_games_finish_within_the_default_cap(n: int) -> None:
     for seed in range(3):
         _, out = run_cli("random", "--n", str(n), "--seed", str(seed), "--no-save", "--json")
         assert json.loads(out)["status"] == "won"
+
+
+# --- repetition limit is off unless asked for ---------------------------------------------
+
+
+def test_repetition_limit_defaults_to_off_everywhere() -> None:
+    parser = cli.build_parser()
+    assert parser.parse_args(["random", "--n", "1"]).repetition_limit == 0
+    assert (
+        parser.parse_args(["play", "--a", "human", "--b", "random", "--n", "1"]).repetition_limit
+        == 0
+    )
+    assert parser.parse_args(["replay", "x.json"]).repetition_limit == 0
+    assert (
+        parser.parse_args(["random", "--n", "1", "--repetition-limit", "3"]).repetition_limit == 3
+    )
+
+
+def test_random_game_with_explicit_repetition_limit_can_stalemate() -> None:
+    # n=1, seed 0: the initial position recurs quickly with a limit of 2
+    _, out = run_cli(
+        "random", "--n", "1", "--seed", "0", "--no-save", "--json", "--repetition-limit", "2"
+    )
+    assert json.loads(out)["status"] in ("stalemate", "won")
+    _, out = run_cli("random", "--n", "1", "--seed", "0", "--no-save", "--json")
+    assert json.loads(out)["status"] == "won"
