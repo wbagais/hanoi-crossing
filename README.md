@@ -8,11 +8,15 @@ take-home task in [`SPEC.md`](SPEC.md).
 tests, this README). Web UI, HTTP API, RL wrapper, and LLM agent are described
 under [Future work](#future-work) and deliberately not built.
 
+**Contents:** [Quick start](#quick-start) · [The game](#the-game) ·
+[Using it](#using-it) · [Design](#design) · [Reuse: RL and service](#reuse-rl-loop-and-simulation-service-not-built) ·
+[Beyond the spec](#beyond-the-spec) · [Project notes](#project-notes)
+
 ## Quick start
 
 ```bash
 uv sync
-uv run pytest                                  # 172 tests
+uv run pytest                                  # 190 tests
 uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
 uv run hanoi random --n 3 --seed 7 --trace     # two random players, every turn shown
 uv run hanoi play --a human --b random --n 2   # you against a random player
@@ -65,7 +69,78 @@ can hand you the win; and finishing your tower is not enough while anything sits
 pole 2. A worked N = 3 game and every rule as a checkable item are in
 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
-## Interpretations
+## Using it
+
+One command, `hanoi`. All subcommands build a start state, a schedule, and one agent
+per player, then hand those to the single runner.
+
+| Command | What it does |
+|---|---|
+| `hanoi replay FILE` | re-plays a recording from the initial position, prints the final state; if unfinished, offers to let random agents finish (`--continue` / `--no-continue` pre-answer; never asks with `--json` or without a TTY) |
+| `hanoi random --n N` | both players random; same as `play --a random --b random` |
+| `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans have `--move-timeout` seconds (default 30) before a random move is played for them |
+| `hanoi recordings` | lists games autosaved to `recordings/` |
+
+Every flag, default, and exit code is in [`docs/USAGE.md`](docs/USAGE.md). The
+essentials: `--seed` (default 0, so runs are reproducible), `--trace` to show every
+turn, `--list` for the compact board, `--json` for machines, `--first` and
+`--schedule` for the turn order, `--max-turns` (default 200 × 3ⁿ), `--save` /
+`--no-save` around the autosave. `uv run hanoi <command> --help` prints the same.
+
+### Output formats
+
+By default a finished game prints the final board and a summary. `--trace` adds
+the full game first, one line per turn with its source. Drawn towers by default;
+`--list` for bracket lists in the spec's cross layout; `--json` for machines. A
+human turn:
+
+```
+Turn 4, player B                     hand: (2)
+
+       |            |            |
+       |            |            |
+       |            |            |
+   ====4====       =1=           |
+   ---------    ---------    ---------
+     pole 1       pole 2       pole 3
+
+  legal: place 1, place 3, skip       (30 s)
+B> place 2
+  illegal: disk 2 cannot go on disk 1. Turn wasted.
+```
+
+The final board shows both sides, then a summary:
+`status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0`.
+
+With `--list` the same final position is the spec's cross layout, poles as
+bracket lists bottom to top (this is `examples/n3_blocked_win.json`; A won with
+B's disk 6 still in B's hand):
+
+```
+                 1a: []
+                  |
+  1b: [4, 2] --- [2]: [] --- 3b: []
+                  |
+                 3a: [5, 3, 1]
+  hand A: -   hand B: 6
+
+status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0
+```
+
+A human turn in list style is three lines:
+
+```
+Turn 4, player B                     hand: 2
+  pole 1: [4]   pole 2: [1]   pole 3: []
+  legal: place 1, place 3, skip
+```
+
+## Design
+
+Every decision, with its reason and the alternatives rejected, is numbered in
+[`docs/DECISIONS.md`](docs/DECISIONS.md). The short version:
+
+### Interpretations
 
 Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
 
@@ -82,11 +157,6 @@ Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
    move can complete yours.
 7. **Ownership is not tracked after setup.** Any player may lift any top disk from
    pole 2 and build with it; the win condition never mentions whose disks they are.
-
-## Design
-
-Every decision, with its reason and the alternatives rejected, is numbered in
-[`docs/DECISIONS.md`](docs/DECISIONS.md). The short version:
 
 ### Engine (`engine.py`, 267 lines)
 
@@ -138,72 +208,6 @@ timeout.
 Moves are player-relative. `sources` is optional and informational. A replay always
 restarts from the initial position; the file stores moves, never board states.
 
-### Output formats
-
-By default a finished game prints the final board and a summary. `--trace` adds
-the full game first, one line per turn with its source. Drawn towers by default;
-`--list` for bracket lists in the spec's cross layout; `--json` for machines. A
-human turn:
-
-```
-Turn 4, player B                     hand: (2)
-
-       |            |            |
-       |            |            |
-       |            |            |
-   ====4====       =1=           |
-   ---------    ---------    ---------
-     pole 1       pole 2       pole 3
-
-  legal: place 1, place 3, skip       (30 s)
-B> place 2
-  illegal: disk 2 cannot go on disk 1. Turn wasted.
-```
-
-The final board shows both sides, then a summary:
-`status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0`.
-
-With `--list` the same final position is the spec's cross layout, poles as
-bracket lists bottom to top (this is `examples/n3_blocked_win.json`; A won with
-B's disk 6 still in B's hand):
-
-```
-                 1a: []
-                  |
-  1b: [4, 2] --- [2]: [] --- 3b: []
-                  |
-                 3a: [5, 3, 1]
-  hand A: -   hand B: 6
-
-status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0
-```
-
-A human turn in list style is three lines:
-
-```
-Turn 4, player B                     hand: 2
-  pole 1: [4]   pole 2: [1]   pole 3: []
-  legal: place 1, place 3, skip
-```
-
-## Frontends
-
-One command, `hanoi`. All subcommands build a start state, a schedule, and one agent
-per player, then hand those to the single runner.
-
-| Command | What it does |
-|---|---|
-| `hanoi replay FILE` | re-plays a recording from the initial position, prints the final state; if unfinished, offers to let random agents finish (`--continue` / `--no-continue` pre-answer; never asks with `--json` or without a TTY) |
-| `hanoi random --n N` | both players random; same as `play --a random --b random` |
-| `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans have `--move-timeout` seconds (default 30) before a random move is played for them |
-| `hanoi recordings` | lists games autosaved to `recordings/` |
-
-Every flag, default, and exit code is in [`docs/USAGE.md`](docs/USAGE.md). The
-essentials: `--seed` (default 0, so runs are reproducible), `--trace` to show every
-turn, `--list` for the compact board, `--json` for machines, `--first` and
-`--schedule` for the turn order, `--max-turns` (default 200 × 3ⁿ), `--save` /
-`--no-save` around the autosave. `uv run hanoi <command> --help` prints the same.
-
 ## Reuse: RL loop and simulation service (not built)
 
 The spec asks that the engine serve, unchanged, as the core of an RL training loop
@@ -241,14 +245,16 @@ and never worries about one request corrupting another. The stage 3 CLI already
 drives the engine "one move at a time" through `play_turn`, which is exactly the
 shape a request handler has.
 
-## Additions beyond the spec
+## Beyond the spec
+
+### Additions
 
 Marked as such so a reviewer can separate what was asked from what we chose:
 human play with a move timeout and random fallback; per-turn move sources; autosave
 of every finished game and `hanoi recordings`; continuing an unfinished replay;
 stalemate detection; drawn tower output.
 
-## Rejected alternatives
+### Rejected alternatives
 
 One line each; the full reasoning is in the decision log.
 
@@ -263,7 +269,7 @@ One line each; the full reasoning is in the decision log.
 - Writing the recording after every turn: unnecessary; once at the end is enough.
 - Poetry, Docker, HTML docs, a pytest pre-commit hook: see D10.
 
-## Future work
+### Future work
 
 - **Web UI + HTTP API.** FastAPI in an optional extra; one page with an SVG board;
   endpoints to create a game, load a recording, move, advance bots, continue; raw
@@ -274,7 +280,9 @@ One line each; the full reasoning is in the decision log.
   actions, parses the reply, falls back to skip. Slow and weak at Hanoi; a
   demonstration of the agent seam, not a player.
 
-## Layout, tests, lint
+## Project notes
+
+### Layout, tests, lint
 
 ```
 SPEC.md               the task, verbatim
@@ -290,7 +298,7 @@ src/hanoi_crossing/
   recording.py        JSON format
   render.py           towers, lists, trace, summary
   cli.py              the hanoi command
-tests/                172 tests; the engine is tested directly, the CLI through main()
+tests/                190 tests; the engine is tested directly, the CLI through main()
 ```
 
 ```bash
@@ -299,7 +307,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run pre-commit install        # ruff hooks; no pytest hook, so red TDD commits pass
 ```
 
-## AI usage
+### AI usage
 
 Claude Code (Claude Fable 5.1) was used throughout, under human direction. The
 model proposed; the author questioned, changed, or accepted every decision, and the
@@ -317,7 +325,7 @@ decision log records which.
   before it became the golden text. D32–D36.
 - **Stage 4:** this README, assembled from the decision log and requirements.
 
-## Journey
+### Journey
 
 Read [`plans/PLAN.md`](plans/PLAN.md) for the plan as approved, then `git log`: every
 unit is a `test:` commit that fails followed by a `feat:` commit that passes, and
