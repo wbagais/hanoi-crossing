@@ -1,6 +1,8 @@
 """Tests for the core engine. IDs in names refer to docs/REQUIREMENTS.md."""
 
 import pytest
+
+from hanoi_crossing import engine
 from hanoi_crossing.engine import (
     ALL_ACTIONS,
     Action,
@@ -9,8 +11,6 @@ from hanoi_crossing.engine import (
     initial_state,
     observe,
 )
-
-from hanoi_crossing import engine
 
 # --- types --------------------------------------------------------------------
 
