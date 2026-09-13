@@ -1,12 +1,13 @@
 # Hanoi Crossing — plan
 
-Working plan for the take-home task in `SPEC.md`. One stage per implementation
-session; each stage keeps a status line below its heading. Every decision made
-during planning or implementation is logged in `docs/DECISIONS.md`.
+The plan as approved before implementation, kept as part of the journey. Each stage
+has a status line below its heading; all are done. Flags and defaults changed after
+stage 4 (decisions D38–D44); `docs/USAGE.md` is the current reference and
+`docs/DECISIONS.md` the log.
 
-## 2. Decisions
+## 1. Decisions
 
-### 2.1 Rules as read
+### 1.1 Rules as read
 
 - Players A and B; private poles 1 and 3 each; pole 2 shared. A has odd disks, B
   even, N each, on pole 1.
@@ -17,7 +18,7 @@ during planning or implementation is logged in `docs/DECISIONS.md`.
   players checked after every action; first win ends the game; no ties possible.
 - Ownership never matters after setup; disks may end up on the other side.
 
-### 2.2 Interpretations (go into `docs/DECISIONS.md` and docstrings)
+### 1.2 Interpretations (go into `docs/DECISIONS.md` and docstrings)
 
 1. All visible poles empty is not a win; pole 3 must hold a disk.
 2. Actions name poles 1–3 from the actor's side; the opponent's poles are inexpressible.
@@ -26,7 +27,7 @@ during planning or implementation is logged in `docs/DECISIONS.md`.
 5. Game ends won, stalemate (same position and player to move K times), or
    unfinished (schedule exhausted); later schedule entries count as unplayed.
 
-### 2.3 Tooling and process
+### 1.3 Tooling and process
 
 - uv; dev deps pytest, ruff, pre-commit (ruff hooks only, so failing-test commits
   pass). `.python-version` 3.12. No Poetry, Docker, or CI.
@@ -37,7 +38,7 @@ during planning or implementation is logged in `docs/DECISIONS.md`.
 - All docs are Markdown: `README.md`, `SPEC.md`, `docs/REQUIREMENTS.md`,
   `docs/DECISIONS.md`, `plans/PLAN.md`.
 
-## 3. Architecture
+## 2. Architecture
 
 ```
 src/hanoi_crossing/
@@ -71,9 +72,9 @@ Engine holds nothing between calls and never sees where a move came from. Agents
 receive only an `Observation` and the legal actions. The runner owns the loop and
 the turn log for one game. Frontends hold state between calls.
 
-## 4. Game flow
+## 3. Game flow
 
-### 4.1 Whole game
+### 3.1 Whole game
 
 ```mermaid
 flowchart TD
@@ -90,7 +91,7 @@ A replay always restarts from the initial position and re-plays the recorded mov
 Continuing an unfinished replay is a second Build with the replayed final state and
 two random agents.
 
-### 4.2 Play loop (DFD)
+### 3.2 Play loop (DFD)
 
 ```mermaid
 flowchart TD
@@ -120,7 +121,7 @@ Observe runs on every turn for every agent kind. Unparseable typed text is
 re-prompted at no cost (inside Show view and prompt). The prompt detects a timeout
 and reports it; Choose invokes the fallback and labels the source `timeout`.
 
-### 4.3 Play paths (all implemented, all through the same loop)
+### 3.3 Play paths (all implemented, all through the same loop)
 
 | Path | Command | Agent A | Agent B |
 |---|---|---|---|
@@ -131,7 +132,7 @@ and reports it; Choose invokes the fallback and labels the source `timeout`.
 | Random vs human | `hanoi play --a random --b human --n 3 --first B` | Random | External |
 | Human vs human | `hanoi play --a human --b human --n 2 --first A` | External | External |
 
-## 5. Requirements traceability
+## 4. Requirements traceability
 
 | ID | Requirement | Stage | Done |
 |---|---|---|---|
@@ -154,7 +155,7 @@ and reports it; Choose invokes the fallback and labels the source `timeout`.
 | T4 | Tests exercise the engine directly | 1 | ✓ tests/test_engine.py, 65 tests |
 | T5 | Reusable as RL environment core, unchanged | 1; 4 README | ✓ README Reuse; observe / ALL_ACTIONS / no clock |
 | T6 | Reusable as concurrent-service core, unchanged | 1; 4 README | ✓ README Reuse; immutable hashable State, to_dict |
-| T7 | Do not build RL or service | all; §7 | ✓ nothing built; README Future work |
+| T7 | Do not build RL or service | all; §6 | ✓ nothing built; README Future work |
 | T8 | Random player consumes engine as an external agent would | 2 | ✓ agents.Agent protocol; test never receives a State |
 | T9 | Design input, output, internal model | 1, 2, 3 | ✓ engine model, recording format, render output |
 | T10 | Decide and document open rules | 1; 4 | ✓ docs/REQUIREMENTS.md I1–I7; engine docstring |
@@ -165,7 +166,7 @@ and reports it; Choose invokes the fallback and labels the source `timeout`.
 | S2 | Disclose AI usage | 0; all; 4 | ✓ README AI usage; docs/DECISIONS.md |
 | S3 | ~2 h, WIP OK | stages 0–3 are a complete submission | ✓ stages 0–3 complete; stage 4 docs |
 
-## 6. Stages
+## 5. Stages
 
 Each stage: Goal · Deliverables · Tests (written first) · Commits · Done when.
 
@@ -184,17 +185,17 @@ Each stage: Goal · Deliverables · Tests (written first) · Commits · Done whe
 - `src/hanoi_crossing/__init__.py` with `__version__`.
 - `SPEC.md` (verbatim spec); `examples/spec_n1.json`
   `{"n":1,"turn_order":"ABA","moves":["lift 1","lift 1","place 3"]}`.
-- `docs/REQUIREMENTS.md`: the spec restated under the IDs of §5, plus a final
-  "Interpretations and additions" section (§2.2 and everything beyond the spec,
+- `docs/REQUIREMENTS.md`: the spec restated under the IDs of §4, plus a final
+  "Interpretations and additions" section (§1.2 and everything beyond the spec,
   marked as additions).
 - `docs/DECISIONS.md`: numbered log, entry = context · choice · reason · rejected.
-  Seeded with §2, §3, the CLI decisions of stage 3, and the future-work choices of
-  §7; appended by every later stage.
+  Seeded with §1, §2, the CLI decisions of stage 3, and the future-work choices of
+  §6; appended by every later stage.
 - `README.md` skeleton: What it is (WIP) · Quick start · Rules (link REQUIREMENTS)
   · Design decisions (link DECISIONS) · Engine · Frontends · Reuse (not built) ·
   AI usage · Layout. AI usage: Claude Code (Fable 5.1) for design discussion, plan,
   and implementation under human direction; log per stage.
-- `plans/PLAN.md`: this document from §2 on, with a status line per stage.
+- `plans/PLAN.md`: this document from §1 on, with a status line per stage.
 
 **Tests.** `tests/test_smoke.py` asserts `__version__` (red before it exists).
 
@@ -318,7 +319,7 @@ final state; stage 2 marked done.
 **Status:** done
 
 **Goal.** The spec's two frontends plus human play. Entry point `hanoi`. Follows
-§4.1 and §4.2 step for step: Build game (`cli.py`), play loop (`runner.run`),
+§3.1 and §3.2 step for step: Build game (`cli.py`), play loop (`runner.run`),
 Render (`render.py`), autosave (`recording.dump`).
 
 **Deliverables.** Commands in spec order; `replay` and `random` are required,
@@ -443,7 +444,7 @@ count stated.
 
 **Done when.** README complete; stage 4 marked done.
 
-## 7. Future work (explained in the README, not implemented)
+## 6. Future work (explained in the README, not implemented)
 
 - **Web UI + HTTP API.** FastAPI in an optional extra; one HTML page with an SVG
   board; endpoints to create a game, load a recording, move, advance bots, continue,

@@ -86,4 +86,5 @@ Board:
 | A3 | Autosave of every finished game to `recordings/`; `hanoi recordings` lists them. | Gives replay fixtures for free and lets an unfinished game be continued. |
 | A4 | Continue an unfinished replay with random agents (prompt or `--continue`). | Natural use of the same loop from a different start state. |
 | A5 | Drawn tower output by default; `--list`, `--json`, `--trace` alternatives. | Readability. |
-| A6 | Future work, not built: web UI + HTTP API, RL wrapper, LLM agent. | Described in the README to show the engine needs no change. |
+| A6 | Ending a game early: `quit` at the prompt, Ctrl-C, or `--max-timeouts` unanswered prompts in a row; the game is saved as unfinished. | An absent human must not leave the game playing itself; every exit should leave a continuable recording. |
+| A7 | Future work, not built: web UI + HTTP API, RL wrapper, LLM agent. | Described in the README to show the engine needs no change. |

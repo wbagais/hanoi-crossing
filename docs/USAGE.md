@@ -80,17 +80,8 @@ Opponent turns print one line each, for example
 `Turn 4, player B: lift 2 → took disk 1 from the shared pole`. Two humans on one
 terminal see each other's turns.
 
-### Ending a game early
-
-| How | Effect |
-|---|---|
-| type `quit` (or `q`, `exit`) at the prompt | game ends as `unfinished`, is autosaved, prints `game ended: player A quit` |
-| Ctrl-C during a human turn | same, with `game ended: interrupted` |
-| K unanswered prompts in a row (`--max-timeouts`, default 3) | same, with `game ended: player A did not answer 3 prompts in a row` |
-| Ctrl-C during a random game or replay | exits with code 130; nothing is saved |
-
-An unfinished autosaved game can be picked up later with
-`hanoi replay <file> --continue`.
+To end a game early type `quit` at the prompt, press Ctrl-C, or stop answering;
+see [Game end statuses](#game-end-statuses) for what each does.
 
 ### Who can make an illegal move
 

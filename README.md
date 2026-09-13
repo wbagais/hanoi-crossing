@@ -16,7 +16,7 @@ under [Future work](#future-work) and deliberately not built.
 
 ```bash
 uv sync
-uv run pytest                                  # 190 tests
+uv run pytest                                  # 195 tests
 uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
 uv run hanoi random --n 3 --seed 7 --trace     # two random players, every turn shown
 uv run hanoi play --a human --b random --n 2   # you against a random player
@@ -66,8 +66,9 @@ What makes it interesting: the sizes interleave, so A's disk 3 can sit under B's
 disk 2; the shared pole is the only scratch pole and both players compete for it;
 disks can cross sides for good; an opponent lifting their disk off the shared pole
 can hand you the win; and finishing your tower is not enough while anything sits on
-pole 2. A worked N = 3 game and every rule as a checkable item are in
-[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+pole 2. Watch all of that in one game with
+`uv run hanoi replay examples/n3_blocked_win.json --trace`. Every rule as a
+checkable item is in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
 ## Using it
 
@@ -256,10 +257,12 @@ shape a request handler has.
 
 ### Additions
 
-Marked as such so a reviewer can separate what was asked from what we chose:
-human play with a move timeout and random fallback; per-turn move sources; autosave
-of every finished game and `hanoi recordings`; continuing an unfinished replay;
-stalemate detection; drawn tower output.
+Marked as such so a reviewer can separate what was asked from what we chose
+(A1–A7 in `docs/REQUIREMENTS.md`): human play with a move timeout and random
+fallback; per-turn move sources; autosave of every finished game and
+`hanoi recordings`; continuing an unfinished replay; ending a game early with
+`quit`, Ctrl-C, or repeated timeouts; opt-in stalemate detection; drawn tower
+output.
 
 ### Rejected alternatives
 
@@ -297,7 +300,7 @@ docs/REQUIREMENTS.md  spec restated with IDs; interpretations and additions
 docs/DECISIONS.md     decision log
 docs/USAGE.md         every command, flag, default, exit code
 plans/PLAN.md         the stage plan, traceability table, status per stage
-examples/spec_n1.json the spec's example as a recording
+examples/             six recordings, each showing one rule; all pinned by tests
 src/hanoi_crossing/
   engine.py           rules (267 lines, guarded by a test at < 500)
   agents.py           Random / Scripted / External agents
@@ -305,7 +308,7 @@ src/hanoi_crossing/
   recording.py        JSON format
   render.py           towers, lists, trace, summary
   cli.py              the hanoi command
-tests/                190 tests; the engine is tested directly, the CLI through main()
+tests/                195 tests; the engine is tested directly, the CLI through main()
 ```
 
 ```bash
@@ -331,6 +334,10 @@ decision log records which.
 - **Stage 3:** renderer and CLI, same pattern; the author approved the tower output
   before it became the golden text. D32–D36.
 - **Stage 4:** this README, assembled from the decision log and requirements.
+- **After stage 4:** fixes that came from the author playing the game: default
+  output, bot turn lines, the `--max-turns` formula measured from random play, the
+  repetition limit made opt-in, and ways to end a game early. D38–D44, two of them
+  reversing earlier choices.
 
 ### Journey
 
