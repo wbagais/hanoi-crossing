@@ -316,15 +316,16 @@ def cmd_game(session: Session, sources: dict[str, str]) -> int:
         else:
             agents[p] = RandomAgent(rng, allow_skip=not args.no_skip)
     mode = "random" if set(sources.values()) == {"random"} else "play"
+    max_turns = args.max_turns or default_max_turns(args.n)
     session.say(
         f"Hanoi Crossing  n={args.n}  seed={args.seed}  schedule={pattern} "
-        f"(repeats, max {args.max_turns} turns)"
+        f"(repeats, max {max_turns} turns)"
     )
     session.say(f"A: {sources['A']}   B: {sources['B']}")
     start = initial_state(args.n)
     result = run(
         start,
-        repeat(pattern, args.max_turns),
+        repeat(pattern, max_turns),
         agents,
         repetition_limit=args.repetition_limit or None,
         on_turn=_on_turn_factory(session, agents, prompts),
@@ -353,14 +354,15 @@ def cmd_replay(session: Session) -> int:
     pattern = _schedule_pattern(args, "B" if last == "A" else "A")
     rng = random.Random(args.seed)
     agents: dict[str, Agent] = {"A": RandomAgent(rng), "B": RandomAgent(rng)}
+    max_turns = args.max_turns or default_max_turns(rec.n)
     session.say()
     session.say(
         f"continuing with random agents  seed={args.seed}  schedule={pattern} "
-        f"(max {args.max_turns} turns)"
+        f"(max {max_turns} turns)"
     )
     more = run(
         result.final_state,
-        repeat(pattern, args.max_turns),
+        repeat(pattern, max_turns),
         agents,
         repetition_limit=args.repetition_limit or None,
     )
