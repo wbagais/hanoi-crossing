@@ -197,14 +197,11 @@ per player, then hand those to the single runner.
 | `hanoi play --a SRC --b SRC --n N` | any mix of `random` and `human`; humans have `--move-timeout` seconds (default 30) before a random move is played for them |
 | `hanoi recordings` | lists games autosaved to `recordings/` |
 
-Shared flags: `--seed` (default 0, so runs are reproducible; pass another number for a
-different game), `--json`, `--list`, `--trace`. Game flags: `--first A|B`,
-`--schedule AB` (any pattern of A and B, repeated), `--max-turns` (default
-200 × 3ⁿ, which random players need; see D41),
-`--repetition-limit K` (stalemate after K repeats of a position; off by default,
-see D42), `--no-skip`,
-`--save FILE`, `--no-save`. Every finished game is autosaved once, at the end.
-Exit codes: 0 ok, 1 bad recording, 2 bad arguments.
+Every flag, default, and exit code is in [`docs/USAGE.md`](docs/USAGE.md). The
+essentials: `--seed` (default 0, so runs are reproducible), `--trace` to show every
+turn, `--list` for the compact board, `--json` for machines, `--first` and
+`--schedule` for the turn order, `--max-turns` (default 200 × 3ⁿ), `--save` /
+`--no-save` around the autosave. `uv run hanoi <command> --help` prints the same.
 
 ## Reuse: RL loop and simulation service (not built)
 
@@ -281,7 +278,8 @@ One line each; the full reasoning is in the decision log.
 ```
 SPEC.md               the task, verbatim
 docs/REQUIREMENTS.md  spec restated with IDs; interpretations and additions
-docs/DECISIONS.md     decision log, D1–D36
+docs/DECISIONS.md     decision log
+docs/USAGE.md         every command, flag, default, exit code
 plans/PLAN.md         the stage plan, traceability table, status per stage
 examples/spec_n1.json the spec's example as a recording
 src/hanoi_crossing/
