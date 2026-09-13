@@ -246,3 +246,27 @@ def test_full_game_trace_is_shown_by_default() -> None:
 def test_no_trace_hides_the_turn_lines() -> None:
     _, out = run_cli("replay", SPEC, "--no-trace")
     assert _trace_lines(out) == [] and "status won" in out
+
+
+def test_bot_turn_lines_explain_shared_pole_effects() -> None:
+    # seed 0, n=1: A places disk 1 on pole 2 at turn 3, random B lifts it at turn 4
+    stdin = "lift 1\nplace 2\nskip\nskip\n"
+    _, out = run_cli(
+        "play",
+        "--a",
+        "human",
+        "--b",
+        "random",
+        "--n",
+        "1",
+        "--seed",
+        "0",
+        "--no-save",
+        "--move-timeout",
+        "0",
+        "--max-turns",
+        "8",
+        stdin=stdin,
+    )
+    assert "Turn 4, player B: lift 2 → took disk 1 from the shared pole" in out
+    assert "Turn 2, player B: skip" in out
