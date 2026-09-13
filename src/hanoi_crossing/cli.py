@@ -35,6 +35,18 @@ from .render import (
 from .runner import RunResult, Turn, repeat, rotate_to, run
 
 EXIT_OK, EXIT_BAD_FILE, EXIT_BAD_ARGS = 0, 1, 2
+
+
+def default_max_turns(n: int) -> int:
+    """Schedule length when --max-turns is not given.
+
+    Random games need roughly three times more turns per extra disk (measured
+    medians 10, 44, 136, 474, 1434 for n = 1..5; worst cases about 3x the median).
+    200 * 3**n clears every observed worst case with headroom (D41).
+    """
+    return 200 * 3**n
+
+
 PROMPT_HELP = "not a move, try again: lift N | place N | skip  (N = 1, 2, 3)"
 
 
@@ -50,7 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     game = argparse.ArgumentParser(add_help=False)
     game.add_argument("--schedule", default="AB", help="turn-order pattern, repeated (default AB)")
-    game.add_argument("--max-turns", type=int, default=1000, help="schedule length (default 1000)")
+    game.add_argument(
+        "--max-turns", type=int, default=None, help="schedule length (default 200 * 3**n)"
+    )
     game.add_argument(
         "--repetition-limit",
         type=int,

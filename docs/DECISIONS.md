@@ -278,3 +278,15 @@ makes the decision. The README's design section is a summary of this log.
 - **Choice:** default prints the final board and summary; `--trace` adds the full
   game. `--no-trace` is removed.
 - **Rejected:** trace by default (D38).
+
+### D41. `--max-turns` defaults to 200 · 3ⁿ
+- **Context:** with a flat default of 1000, every random game above n = 3 ended
+  `unfinished`; ten disks need 2046 turns even for a perfect solo player.
+- **Measurement:** random-vs-random games over 20 seeds needed median 10, 44,
+  136, 474, 1434 turns for n = 1..5, worst cases 43, 152, 510, 2427, 4175. Roughly
+  ×3 per disk.
+- **Choice:** default schedule length 200 · 3ⁿ (600, 1800, 5400, 16200, 48600, …),
+  about three times the observed worst case; `--max-turns` still overrides. Same
+  default for continuing an unfinished replay.
+- **Rejected:** a flat number (wrong for every n but one); 4ⁿ (grows faster than
+  the data and makes large n slow for no benefit).

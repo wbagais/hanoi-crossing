@@ -176,7 +176,8 @@ per player, then hand those to the single runner.
 
 Shared flags: `--seed` (default 0, so runs are reproducible; pass another number for a
 different game), `--json`, `--list`, `--trace`. Game flags: `--first A|B`,
-`--schedule AB` (any pattern of A and B, repeated), `--max-turns 1000`,
+`--schedule AB` (any pattern of A and B, repeated), `--max-turns` (default
+200 × 3ⁿ, which random players need; see D41),
 `--repetition-limit 10` (stalemate detection, `0` disables), `--no-skip`,
 `--save FILE`, `--no-save`. Every finished game is autosaved once, at the end.
 Exit codes: 0 ok, 1 bad recording, 2 bad arguments.
