@@ -352,13 +352,14 @@ def test_three_consecutive_timeouts_end_the_game() -> None:
     code, out = _play("", "--move-timeout", "0.05")
     data = json.loads(out)
     assert code == 0 and data["status"] == "unfinished"
+    # the third unanswered prompt ends the game; the first two were played by the fallback
     human_turns = [t for t in data["turns"] if t["player"] == "A"]
-    assert len(human_turns) == 3 and all(t["source"] == "timeout" for t in human_turns)
+    assert len(human_turns) == 2 and all(t["source"] == "timeout" for t in human_turns)
 
 
 def test_max_timeouts_flag_changes_the_count_and_zero_disables() -> None:
     _, out = _play("", "--move-timeout", "0.02", "--max-timeouts", "1")
-    assert len([t for t in json.loads(out)["turns"] if t["player"] == "A"]) == 1
+    assert len([t for t in json.loads(out)["turns"] if t["player"] == "A"]) == 0
     _, out = _play("", "--move-timeout", "0.02", "--max-timeouts", "0", "--max-turns", "10")
     assert len([t for t in json.loads(out)["turns"] if t["player"] == "A"]) == 5
 

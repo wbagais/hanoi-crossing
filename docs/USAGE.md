@@ -69,7 +69,7 @@ Any mix of players. Takes every flag of `random` plus:
 | `--a SRC` | required | — | Player A's move source: `random` or `human`. |
 | `--b SRC` | required | — | Player B's move source: `random` or `human`. |
 | `--move-timeout S` | optional | `30` | Seconds a human has to answer the prompt. When it runs out, a random legal move is played for them and the turn is marked `timeout`. `0` disables the limit. |
-| `--max-timeouts K` | optional | `3` | After K unanswered prompts in a row the human is treated as gone and the game ends as `unfinished`. `0` never ends the game this way. |
+| `--max-timeouts K` | optional | `3` | The K-th unanswered prompt in a row ends the game as `unfinished` (the first K−1 are played by the random fallback). `1` means never play for me; `0` never ends the game this way. |
 
 A human turn prints that player's view only (own poles 1 and 3, the shared pole 2,
 own hand), the legal actions, the remaining seconds, and the prompt `A>` or `B>`.
