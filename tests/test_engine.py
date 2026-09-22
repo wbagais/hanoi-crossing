@@ -36,6 +36,27 @@ def test_action_space_is_fixed_seven_in_order() -> None:
     )
 
 
+@pytest.mark.parametrize("action", ALL_ACTIONS)
+def test_action_text_round_trip(action: Action) -> None:
+    assert Action.parse(str(action)) == action
+
+
+@pytest.mark.parametrize(
+    ("text", "action"),
+    [("lift 1", Action("lift", 1)), ("  place 3 ", Action("place", 3)), ("skip", Action("skip"))],
+)
+def test_action_parse_examples(text: str, action: Action) -> None:
+    assert Action.parse(text) == action
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "lift", "lift 4", "lift 12", "lift x", "skip 1", "jump 1", "lift 1 2", 7]
+)
+def test_action_parse_rejects_bad_text(bad: object) -> None:
+    with pytest.raises(ValueError):
+        Action.parse(bad)
+
+
 def test_state_is_immutable_and_hashable() -> None:
     s = initial_state(1)
     with pytest.raises(AttributeError):
@@ -137,17 +158,17 @@ def test_legal_actions_order_follows_all_actions() -> None:
 def test_step_lift_and_place_change_state() -> None:
     s0 = initial_state(1)
     s1, out = step(s0, "A", Action("lift", 1))
-    assert out == Outcome(legal=True, reason=None, winner=None, done=False)
+    assert out == Outcome(legal=True, reason=None, winner=None, done=False, disk=1)
     assert s1.poles["1a"] == () and s1.hands["A"] == 1
     assert s0.poles["1a"] == (1,), "old state must be untouched"
     s2, out = step(s1, "A", Action("place", 2))
-    assert out.legal and s2.poles["2"] == (1,) and s2.hands["A"] is None
+    assert out.legal and out.disk == 1 and s2.poles["2"] == (1,) and s2.hands["A"] is None
 
 
 def test_step_skip_is_legal_and_changes_nothing() -> None:
     s = initial_state(1)
     s2, out = step(s, "B", Action("skip"))
-    assert out.legal and s2 == s
+    assert out.legal and out.disk is None and s2 == s
 
 
 @pytest.mark.parametrize(
@@ -229,7 +250,7 @@ def test_spec_example_n1_a_wins_in_three_steps() -> None:
     s, o2 = step(s, "B", Action("lift", 1))
     s, o3 = step(s, "A", Action("place", 3))
     assert (o1.done, o2.done) == (False, False)
-    assert o3 == Outcome(legal=True, reason=None, winner="A", done=True)
+    assert o3 == Outcome(legal=True, reason=None, winner="A", done=True, disk=1)
     assert winner(s) == "A"
     assert s.poles["3a"] == (1,) and s.hands["B"] == 2
 
@@ -247,7 +268,7 @@ def test_opponents_lift_from_shared_pole_hands_over_the_win() -> None:
     s = make({"3a": (5, 3, 1), "2": (6,), "1b": (4, 2)})
     assert winner(s) is None
     s2, out = step(s, "B", Action("lift", 2))
-    assert out == Outcome(legal=True, reason=None, winner="A", done=True)
+    assert out == Outcome(legal=True, reason=None, winner="A", done=True, disk=6)
     assert winner(s2) == "A"
 
 

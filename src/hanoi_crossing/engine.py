@@ -30,12 +30,16 @@ PLAYERS: tuple[Player, ...] = ("A", "B")
 POLE_KEYS: tuple[str, ...] = ("1a", "2", "3a", "1b", "3b")
 SHARED = "2"
 
-_PRIVATE_KEYS: dict[tuple[Player, int], str] = {
-    ("A", 1): "1a",
-    ("A", 3): "3a",
-    ("B", 1): "1b",
-    ("B", 3): "3b",
+SIDES: dict[Player, dict[int, str]] = {
+    "A": {1: "1a", 2: SHARED, 3: "3a"},
+    "B": {1: "1b", 2: SHARED, 3: "3b"},
 }
+"""Each player's poles 1, 2, 3 as State pole keys. The one place the board layout lives."""
+
+
+def is_positive_int(value: object) -> bool:
+    """True for 1, 2, 3, ...; False for 0, floats, strings, and bools."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
 
 
 @dataclass(frozen=True)
@@ -44,6 +48,19 @@ class Action:
 
     verb: Verb
     pole: PoleIndex | None = None
+
+    def __str__(self) -> str:
+        return self.verb if self.pole is None else f"{self.verb} {self.pole}"
+
+    @classmethod
+    def parse(cls, text: object) -> Action:
+        """``"lift 1"`` / ``"place 3"`` / ``"skip"`` -> Action. Inverse of ``str``."""
+        parts = text.split() if isinstance(text, str) else []
+        if parts == ["skip"]:
+            return cls("skip")
+        if len(parts) == 2 and parts[0] in ("lift", "place") and parts[1] in ("1", "2", "3"):
+            return cls(parts[0], int(parts[1]))  # type: ignore[arg-type]
+        raise ValueError(f"bad move {text!r}; expected 'lift N', 'place N' (N=1..3) or 'skip'")
 
 
 ALL_ACTIONS: tuple[Action, ...] = (
@@ -90,12 +107,16 @@ class Observation:
 
 @dataclass(frozen=True)
 class Outcome:
-    """Result of one ``step``. ``winner``/``done`` reflect the returned state."""
+    """Result of one ``step``. ``winner``/``done`` reflect the returned state.
+
+    ``disk`` is the disk that was lifted or placed; None for skip and illegal moves.
+    """
 
     legal: bool
     reason: str | None
     winner: Player | None
     done: bool
+    disk: int | None = None
 
 
 def _require_player(player: object) -> Player:
@@ -106,18 +127,15 @@ def _require_player(player: object) -> Player:
 
 def pole_key(player: Player, pole: int) -> str:
     """Map a player-relative pole number (1, 2, 3) to a State pole key."""
-    _require_player(player)
-    if pole == 2:
-        return SHARED
     try:
-        return _PRIVATE_KEYS[(player, pole)]
+        return SIDES[_require_player(player)][pole]
     except KeyError:
         raise ValueError(f"pole must be 1, 2 or 3, got {pole!r}") from None
 
 
 def initial_state(n: int) -> State:
     """Starting position: A has odd disks 2n-1..1 on 1a, B has even 2n..2 on 1b (R1, R4)."""
-    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+    if not is_positive_int(n):
         raise ValueError(f"n must be a positive integer, got {n!r}")
     return State(
         n=n,
@@ -134,13 +152,9 @@ def initial_state(n: int) -> State:
 
 def observe(state: State, player: Player) -> Observation:
     """The partial view a player is allowed to see (R3). Never the opponent's side."""
-    _require_player(player)
+    side = SIDES[_require_player(player)]
     return Observation(
-        poles={
-            1: state.poles[pole_key(player, 1)],
-            2: state.poles[SHARED],
-            3: state.poles[pole_key(player, 3)],
-        },
+        poles={i: state.poles[key] for i, key in side.items()},
         hand=state.hands[player],
     )
 
@@ -153,11 +167,12 @@ def winner(state: State) -> Player | None:
     satisfy this in any reachable state, so the first match is the winner.
     """
     for p in PLAYERS:
+        side = SIDES[p]
         if (
             state.hands[p] is None
-            and not state.poles[pole_key(p, 1)]
+            and not state.poles[side[1]]
             and not state.poles[SHARED]
-            and state.poles[pole_key(p, 3)]
+            and state.poles[side[3]]
         ):
             return p
     return None
@@ -182,17 +197,16 @@ def _illegal_reason(state: State, player: Player, action: Action) -> str | None:
     """Why a well-formed action is illegal in this position, or None if legal."""
     if action.verb == "skip":
         return None
-    key = pole_key(player, action.pole)  # type: ignore[arg-type]
+    pole = state.poles[pole_key(player, action.pole)]  # type: ignore[arg-type]
     held = state.hands[player]
     if action.verb == "lift":
         if held is not None:
             return "hand is not empty"
-        if not state.poles[key]:
+        if not pole:
             return f"pole {action.pole} is empty"
         return None
     if held is None:
         return "hand is empty"
-    pole = state.poles[key]
     if pole and pole[-1] < held:
         return f"disk {held} cannot go on disk {pole[-1]}"
     return None
@@ -226,14 +240,16 @@ def step(state: State, player: Player, action: Action) -> tuple[State, Outcome]:
     poles = dict(state.poles)
     hands = dict(state.hands)
     if action.verb == "lift":
-        hands[player] = poles[key][-1]
+        disk = poles[key][-1]
         poles[key] = poles[key][:-1]
+        hands[player] = disk
     else:
-        poles[key] = poles[key] + (hands[player],)  # type: ignore[operator]
+        disk = hands[player]
+        poles[key] = poles[key] + (disk,)  # type: ignore[operator]
         hands[player] = None
     new = State(n=state.n, poles=poles, hands=hands)
     won = winner(new)
-    return new, Outcome(True, None, won, won is not None)
+    return new, Outcome(True, None, won, won is not None, disk)
 
 
 def to_dict(state: State) -> dict:
@@ -250,18 +266,16 @@ def from_dict(data: object) -> State:
     if not isinstance(data, dict) or set(data) != {"n", "poles", "hands"}:
         raise ValueError("state dict needs exactly the keys n, poles, hands")
     n, poles, hands = data["n"], data["poles"], data["hands"]
-    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+    if not is_positive_int(n):
         raise ValueError(f"n must be a positive integer, got {n!r}")
     if not isinstance(poles, dict) or set(poles) != set(POLE_KEYS):
         raise ValueError(f"poles must have exactly the keys {POLE_KEYS}")
     if not isinstance(hands, dict) or set(hands) != set(PLAYERS):
         raise ValueError(f"hands must have exactly the keys {PLAYERS}")
     for key, disks in poles.items():
-        if not isinstance(disks, list | tuple) or not all(
-            isinstance(d, int) and not isinstance(d, bool) and d > 0 for d in disks
-        ):
+        if not isinstance(disks, list | tuple) or not all(is_positive_int(d) for d in disks):
             raise ValueError(f"pole {key} must be a list of positive ints, got {disks!r}")
     for p, held in hands.items():
-        if held is not None and (not isinstance(held, int) or isinstance(held, bool) or held < 1):
+        if held is not None and not is_positive_int(held):
             raise ValueError(f"hand {p} must be a positive int or null, got {held!r}")
     return State(n=n, poles={k: tuple(poles[k]) for k in POLE_KEYS}, hands=dict(hands))
