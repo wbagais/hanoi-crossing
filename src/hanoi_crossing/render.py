@@ -1,20 +1,22 @@
-"""Text rendering for the CLI: turn view, final board, trace, summary.
+"""Text for the terminal: turn view, final board, turn lines, summary, JSON result.
 
-Pure string builders; nothing here prints. Two styles: ``tower`` (default) draws
-disks to scale, ``list`` shows poles as bracket lists in the spec's cross layout.
+Pure builders; nothing here prints. Two styles: ``tower`` (default) draws disks
+to scale, ``list`` shows poles as bracket lists in the spec's cross layout.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .engine import Action, Observation, Outcome, State, initial_state, step
-from .recording import format_action
+from .engine import SIDES, Action, Observation, State, to_dict
 from .runner import RunResult, Turn
 
 MARGIN = "   "
 GAP = "    "
 TITLE_WIDTH = 37
+
+
+# --- towers and lists ----------------------------------------------------------------
 
 
 def _width(n: int) -> int:
@@ -28,12 +30,11 @@ def _disk(d: int) -> str:
 
 def _column(disks: Sequence[int], n: int) -> list[str]:
     """Rows top->bottom for one pole; height 2n so every disk could stack here."""
-    w, h = _width(n), 2 * n
-    rows = []
-    for r in range(h):
-        i = h - 1 - r
-        rows.append((_disk(disks[i]) if i < len(disks) else "|").center(w))
-    return rows
+    height = 2 * n
+    return [
+        (_disk(disks[i]) if i < len(disks) else "|").center(_width(n))
+        for i in reversed(range(height))
+    ]
 
 
 def _towers(columns: Sequence[tuple[str, Sequence[int]]], n: int) -> list[str]:
@@ -68,7 +69,7 @@ def render_view(
     header = (
         f"{f'Turn {index}, player {player}':<{TITLE_WIDTH}}hand: {_hand(observation.hand, style)}"
     )
-    legal_text = "legal: " + ", ".join(format_action(a) for a in legal)
+    legal_text = "legal: " + ", ".join(str(a) for a in legal)
     if seconds is not None:
         legal_text += f"       ({seconds:g} s)"
     if style == "list":
@@ -80,13 +81,12 @@ def render_view(
 
 def render_board(state: State, style: str = "tower") -> str:
     """The full final board, both sides (R12)."""
-    p = state.poles
+    p, hands = state.poles, state.hands
     if style == "list":
         middle = (
             f"  1b: {_brackets(p['1b'])} --- [2]: {_brackets(p['2'])} --- 3b: {_brackets(p['3b'])}"
         )
-        col = middle.index("[2]")
-        pad = " " * col
+        pad = " " * middle.index("[2]")
         return "\n".join(
             [
                 f"{pad}1a: {_brackets(p['1a'])}",
@@ -94,63 +94,67 @@ def render_board(state: State, style: str = "tower") -> str:
                 middle,
                 f"{pad} |",
                 f"{pad}3a: {_brackets(p['3a'])}",
-                f"  hand A: {_hand(state.hands['A'], style)}   "
-                f"hand B: {_hand(state.hands['B'], style)}",
+                f"  hand A: {_hand(hands['A'], style)}   hand B: {_hand(hands['B'], style)}",
             ]
         )
-    n = state.n
-    side_a = _towers([("1a", p["1a"]), ("[2]", p["2"]), ("3a", p["3a"])], n)
-    side_b = _towers([("1b", p["1b"]), ("[2]", p["2"]), ("3b", p["3b"])], n)
-    head_a = f"{'A side':<{TITLE_WIDTH}}hand A: {_hand(state.hands['A'], style)}"
-    head_b = f"{'B side':<{TITLE_WIDTH}}hand B: {_hand(state.hands['B'], style)}"
-    return "\n".join([head_a, "", *side_a, "", head_b, "", *side_b])
+    lines: list[str] = []
+    for player, side in SIDES.items():
+        if lines:
+            lines.append("")
+        columns = [(side[1], p[side[1]]), ("[2]", p[side[2]]), (side[3], p[side[3]])]
+        title = f"{player} side"
+        lines += [f"{title:<{TITLE_WIDTH}}hand {player}: {_hand(hands[player], style)}", ""]
+        lines += _towers(columns, state.n)
+    return "\n".join(lines)
 
 
-def describe_outcome(
-    action: Action, outcome: Outcome, held_after: int | None = None, disk: int | None = None
-) -> str:
+# --- turns ---------------------------------------------------------------------------
+
+
+def describe_turn(turn: Turn) -> str:
+    """What a turn did, in words: ``took disk 1 from the shared pole``."""
+    outcome, action = turn.outcome, turn.action
     if not outcome.legal:
         return f"illegal: {outcome.reason}. Turn wasted."
     if action.verb == "skip":
         return "skip"
+    where = "the shared pole" if action.pole == 2 else f"pole {action.pole}"
     if action.verb == "lift":
-        return f"ok, holding {held_after}"
-    return f"ok, placed {disk} on pole {action.pole}"
+        return f"took disk {outcome.disk} from {where}"
+    return f"put disk {outcome.disk} on {where}"
 
 
-def _describe_by_replay(turns: Sequence[Turn], start: State) -> list[str]:
-    """Re-step the turns to learn which disk moved, for human-readable lines."""
-    out: list[str] = []
-    state = start
-    for t in turns:
-        before = state.hands[t.player]
-        state, _ = step(state, t.player, t.action)
-        out.append(describe_outcome(t.action, t.outcome, state.hands[t.player], before))
-    return out
+def move_text(turn: Turn) -> str:
+    """The move and its effect: ``lift 2 → took disk 1 from the shared pole``."""
+    if turn.action.verb == "skip" and turn.outcome.legal:
+        return "skip"
+    return f"{turn.action} → {describe_turn(turn)}"
 
 
-def render_trace(turns: Sequence[Turn], n: int | None = None, start: State | None = None) -> str:
-    """One line per turn: ``idx player action -> result [source]``.
+def render_trace(turns: Sequence[Turn]) -> str:
+    """One line per turn: ``index player move → effect [source]``.
 
     ``[human]`` and ``[timeout]`` are always shown; ``[random]`` / ``[scripted]``
     only when the game mixes sources.
     """
-    start = start or initial_state(n or 1)
-    texts = _describe_by_replay(turns, start)
-    kinds = {t.source for t in turns}
+    mixed = len({t.source for t in turns}) > 1
     lines = []
-    for t, text in zip(turns, texts, strict=True):
-        mark = f" [{t.source}]" if t.source in ("human", "timeout") or len(kinds) > 1 else ""
-        lines.append(f"{t.index} {t.player} {format_action(t.action)} → {text}{mark}")
+    for t in turns:
+        mark = f" [{t.source}]" if mixed or t.source in ("human", "timeout") else ""
+        lines.append(f"{t.index} {t.player} {move_text(t)}{mark}")
     return "\n".join(lines)
 
 
+# --- results -------------------------------------------------------------------------
+
+
 def counts(result: RunResult) -> dict[str, int]:
+    turns = result.turns
     return {
-        "played": len(result.turns),
-        "illegal": sum(1 for t in result.turns if not t.outcome.legal),
-        "skipped": sum(1 for t in result.turns if t.outcome.legal and t.action.verb == "skip"),
-        "timeouts": sum(1 for t in result.turns if t.source == "timeout"),
+        "played": len(turns),
+        "illegal": sum(1 for t in turns if not t.outcome.legal),
+        "skipped": sum(1 for t in turns if t.outcome.legal and t.action.verb == "skip"),
+        "timeouts": sum(1 for t in turns if t.source == "timeout"),
         "unplayed": result.unplayed,
     }
 
@@ -162,3 +166,24 @@ def render_summary(result: RunResult) -> str:
         f"illegal {c['illegal']} · skipped {c['skipped']} · timeouts {c['timeouts']} · "
         f"unplayed {c['unplayed']}"
     )
+
+
+def result_dict(result: RunResult) -> dict:
+    """The result as plain JSON data (for ``--json``)."""
+    return {
+        "status": result.status,
+        "winner": result.winner,
+        "state": to_dict(result.final_state),
+        "counts": counts(result),
+        "turns": [
+            {
+                "index": t.index,
+                "player": t.player,
+                "action": str(t.action),
+                "legal": t.outcome.legal,
+                "reason": t.outcome.reason,
+                "source": t.source,
+            }
+            for t in result.turns
+        ],
+    }

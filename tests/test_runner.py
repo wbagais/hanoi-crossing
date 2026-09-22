@@ -4,19 +4,17 @@ import random
 
 import pytest
 
-from hanoi_crossing.agents import ExternalAgent, RandomAgent, ScriptedAgent, Timeout
+from hanoi_crossing.agents import RandomAgent, ScriptedAgent
 from hanoi_crossing.engine import Action, State, initial_state, winner
 from hanoi_crossing.runner import (
     RunResult,
     StopGame,
     Turn,
-    from_string,
+    parse_schedule,
     play_turn,
-    random_schedule,
     repeat,
     rotate_to,
     run,
-    to_string,
 )
 
 L1, P2, P3, SKIP = Action("lift", 1), Action("place", 2), Action("place", 3), Action("skip")
@@ -25,16 +23,15 @@ L1, P2, P3, SKIP = Action("lift", 1), Action("place", 2), Action("place", 3), Ac
 # --- schedules -----------------------------------------------------------------
 
 
-def test_from_string_and_to_string() -> None:
-    assert from_string("ABA") == ("A", "B", "A")
-    assert to_string(("A", "B", "A")) == "ABA"
-    assert from_string("") == ()
+def test_parse_schedule() -> None:
+    assert parse_schedule("ABA") == ("A", "B", "A")
+    assert parse_schedule("") == ()
 
 
 @pytest.mark.parametrize("bad", ["ABC", "ab", "A B"])
-def test_from_string_rejects_other_letters(bad: str) -> None:
+def test_parse_schedule_rejects_other_letters(bad: str) -> None:
     with pytest.raises(ValueError):
-        from_string(bad)
+        parse_schedule(bad)
 
 
 def test_repeat_fills_length() -> None:
@@ -54,12 +51,6 @@ def test_rotate_to_starts_at_first_occurrence() -> None:
         rotate_to("A", "B")
 
 
-def test_random_schedule_is_seeded_and_only_a_b() -> None:
-    s1 = random_schedule(random.Random(4), 20)
-    s2 = random_schedule(random.Random(4), 20)
-    assert s1 == s2 and len(s1) == 20 and set(s1) <= {"A", "B"}
-
-
 # --- play_turn -------------------------------------------------------------------
 
 
@@ -71,12 +62,18 @@ def test_play_turn_records_action_outcome_and_source() -> None:
     assert turn.outcome.legal
 
 
-def test_play_turn_source_is_timeout_when_fallback_answered() -> None:
-    def ask(o, lg, t):  # noqa: ANN001
-        raise Timeout
+class Labelled:
+    """An agent that labels each move itself, as a human agent does after a timeout."""
 
-    agent = ExternalAgent(ask, timeout=0.01, fallback=RandomAgent(random.Random(0)))
-    _, turn = play_turn(initial_state(1), "B", agent, index=3)
+    def __init__(self, source: str) -> None:
+        self.source = source
+
+    def choose(self, observation, legal):  # noqa: ANN001, ANN201
+        return legal[0]
+
+
+def test_play_turn_copies_the_agents_source_label() -> None:
+    _, turn = play_turn(initial_state(1), "B", Labelled("timeout"), index=3)
     assert turn.source == "timeout" and turn.index == 3 and turn.player == "B"
 
 
@@ -88,7 +85,7 @@ def _scripted(a: list[Action], b: list[Action]) -> dict:
 
 
 def test_run_spec_n1_example() -> None:
-    result = run(initial_state(1), from_string("ABA"), _scripted([L1, P3], [L1]))
+    result = run(initial_state(1), parse_schedule("ABA"), _scripted([L1, P3], [L1]))
     assert isinstance(result, RunResult)
     assert result.status == "won" and result.winner == "A"
     assert [t.player for t in result.turns] == ["A", "B", "A"]
@@ -97,12 +94,12 @@ def test_run_spec_n1_example() -> None:
 
 
 def test_run_counts_unplayed_entries_after_the_win() -> None:
-    result = run(initial_state(1), from_string("ABABB"), _scripted([L1, P3], [L1, SKIP, SKIP]))
+    result = run(initial_state(1), parse_schedule("ABABB"), _scripted([L1, P3], [L1, SKIP, SKIP]))
     assert result.status == "won" and len(result.turns) == 3 and result.unplayed == 2
 
 
 def test_run_schedule_exhausted_is_unfinished() -> None:
-    result = run(initial_state(1), from_string("AB"), _scripted([L1], [L1]))
+    result = run(initial_state(1), parse_schedule("AB"), _scripted([L1], [L1]))
     assert result.status == "unfinished" and result.winner is None and result.unplayed == 0
     assert result.final_state.hands == {"A": 1, "B": 2}
 
@@ -115,7 +112,7 @@ def test_run_empty_schedule() -> None:
 def test_run_n2_example_with_illegal_move_and_skip() -> None:
     a = [L1, P2, L1, P3, Action("lift", 2), P3]
     b = [L1, P2, SKIP]
-    result = run(initial_state(2), from_string("AABBAABAA"), _scripted(a, b))
+    result = run(initial_state(2), parse_schedule("AABBAABAA"), _scripted(a, b))
     assert result.status == "won" and result.winner == "A" and len(result.turns) == 9
     t4 = result.turns[3]
     assert t4.player == "B" and not t4.outcome.legal
@@ -150,19 +147,12 @@ def test_random_vs_random_finishes_with_a_winner(n: int) -> None:
         assert turn.outcome.legal, "random agents only pick legal actions"
 
 
-def _fake_ask(rng: random.Random):  # noqa: ANN202
-    def ask(observation, legal, timeout):  # noqa: ANN001
-        return rng.choice(list(legal))
-
-    return ask
-
-
 def _agent(kind: str, rng: random.Random, script: list[Action]):  # noqa: ANN202
     if kind == "random":
         return RandomAgent(rng)
     if kind == "scripted":
         return ScriptedAgent(script)
-    return ExternalAgent(_fake_ask(rng))
+    return Labelled("human")
 
 
 @pytest.mark.parametrize("kind_a", ["random", "scripted", "external"])
@@ -185,20 +175,19 @@ def test_run_calls_on_turn_after_each_turn_with_the_new_state() -> None:
     def on_turn(turn: Turn, state: State) -> None:
         seen.append((turn.index, turn.player, state.hands[turn.player] is not None))
 
-    run(initial_state(1), from_string("ABA"), _scripted([L1, P3], [L1]), on_turn=on_turn)
+    run(initial_state(1), parse_schedule("ABA"), _scripted([L1, P3], [L1]), on_turn=on_turn)
     assert seen == [(1, "A", True), (2, "B", True), (3, "A", False)]
 
 
 def test_stop_game_raised_by_an_agent_ends_the_run_as_unfinished() -> None:
     class Quitter:
-        kind = "human"
-        last_fell_back = False
+        source = "human"
 
         def choose(self, observation, legal):  # noqa: ANN001, ANN202
             raise StopGame("player quit")
 
     agents = {"A": ScriptedAgent([L1, P3]), "B": Quitter()}
-    result = run(initial_state(1), from_string("ABAB"), agents)
+    result = run(initial_state(1), parse_schedule("ABAB"), agents)
     assert result.status == "unfinished" and result.winner is None
     assert len(result.turns) == 1 and result.unplayed == 3
     assert result.final_state.hands["A"] == 1

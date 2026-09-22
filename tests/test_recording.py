@@ -1,50 +1,29 @@
-"""JSON recording format: parse, validate, write, and the conversions to the runner (T2, T9)."""
+"""JSON recording format: parse, validate, write, files, and the conversions to the runner."""
 
 import json
 import random
 
 import pytest
+
+from hanoi_crossing.agents import RandomAgent
+from hanoi_crossing.engine import Action, initial_state
 from hanoi_crossing.recording import (
     Recording,
     RecordingFormatError,
+    append_run,
+    autosave_path,
     dump,
     dumps,
-    format_action,
     from_run,
     load,
     loads,
-    parse_action,
     replay,
-    to_agents,
+    seed_in_name,
 )
-
-from hanoi_crossing.agents import RandomAgent
-from hanoi_crossing.engine import ALL_ACTIONS, Action, initial_state
 from hanoi_crossing.runner import repeat, run
 
 SPEC = {"n": 1, "turn_order": "ABA", "moves": ["lift 1", "lift 1", "place 3"]}
-
-
-# --- action strings ---------------------------------------------------------------
-
-
-@pytest.mark.parametrize("action", ALL_ACTIONS)
-def test_action_string_round_trip(action: Action) -> None:
-    assert parse_action(format_action(action)) == action
-
-
-@pytest.mark.parametrize(
-    ("text", "action"),
-    [("lift 1", Action("lift", 1)), ("  place 3 ", Action("place", 3)), ("skip", Action("skip"))],
-)
-def test_parse_action_examples(text: str, action: Action) -> None:
-    assert parse_action(text) == action
-
-
-@pytest.mark.parametrize("bad", ["", "lift", "lift 4", "lift x", "skip 1", "jump 1", "lift 1 2", 7])
-def test_parse_action_rejects_bad_text(bad: object) -> None:
-    with pytest.raises(RecordingFormatError):
-        parse_action(bad)  # type: ignore[arg-type]
+L1, P3, SKIP = Action("lift", 1), Action("place", 3), Action("skip")
 
 
 # --- loads / dumps ------------------------------------------------------------------
@@ -52,12 +31,12 @@ def test_parse_action_rejects_bad_text(bad: object) -> None:
 
 def test_loads_spec_example() -> None:
     rec = loads(json.dumps(SPEC))
-    assert rec == Recording(n=1, turn_order="ABA", moves=("lift 1", "lift 1", "place 3"))
+    assert rec == Recording(n=1, turn_order="ABA", moves=(L1, L1, P3))
     assert rec.sources is None
 
 
 def test_dumps_loads_round_trip_with_sources() -> None:
-    rec = Recording(n=2, turn_order="AB", moves=("lift 1", "skip"), sources=("human", "timeout"))
+    rec = Recording(n=2, turn_order="AB", moves=(L1, SKIP), sources=("human", "timeout"))
     assert loads(dumps(rec)) == rec
     assert json.loads(dumps(rec))["sources"] == ["human", "timeout"]
 
@@ -103,17 +82,21 @@ def test_loads_rejects_bad_recordings(text: str) -> None:
         loads(text)
 
 
-# --- to_agents / replay / from_run -----------------------------------------------------
+def test_recording_rejects_text_moves() -> None:
+    with pytest.raises(RecordingFormatError):
+        Recording(n=1, turn_order="A", moves=("lift 1",))  # type: ignore[arg-type]
 
 
-def test_to_agents_splits_moves_per_player() -> None:
-    rec = loads(json.dumps(SPEC))
-    agents = to_agents(rec)
-    assert set(agents) == {"A", "B"}
-    obs, legal = None, []
-    assert agents["A"].choose(obs, legal) == Action("lift", 1)  # type: ignore[arg-type]
-    assert agents["B"].choose(obs, legal) == Action("lift", 1)  # type: ignore[arg-type]
-    assert agents["A"].choose(obs, legal) == Action("place", 3)  # type: ignore[arg-type]
+def test_autosave_path_is_fresh_and_names_the_seed(tmp_path) -> None:  # noqa: ANN001
+    first = autosave_path(tmp_path / "recordings", "random", 2, 7)
+    assert first.parent.is_dir() and first.name.endswith("-random-n2-seed7.json")
+    first.write_text("{}")
+    second = autosave_path(tmp_path / "recordings", "random", 2, 7)
+    assert second != first and not second.exists()
+    assert seed_in_name(first) == "7" and seed_in_name(tmp_path / "game.json") is None
+
+
+# --- replay / from_run / append_run -----------------------------------------------------
 
 
 def test_replay_spec_example_a_wins() -> None:
@@ -145,3 +128,15 @@ def test_from_run_then_replay_gives_identical_final_state() -> None:
     again = replay(loads(dumps(rec)))
     assert again.final_state == result.final_state
     assert again.status == result.status == "won" and again.winner == result.winner
+
+
+def test_append_run_keeps_the_recorded_part_and_adds_the_new_turns() -> None:
+    rec = loads(_with(turn_order="AB", moves=["lift 1", "lift 1"]))
+    rng = random.Random(0)
+    more = run(
+        replay(rec).final_state, repeat("AB", 600), {"A": RandomAgent(rng), "B": RandomAgent(rng)}
+    )
+    whole = append_run(rec, more)
+    assert whole.moves[:2] == rec.moves and len(whole.moves) == 2 + len(more.turns)
+    assert whole.sources == ("scripted", "scripted") + ("random",) * len(more.turns)
+    assert replay(whole).final_state == more.final_state

@@ -167,7 +167,7 @@ def test_play_human_vs_random_with_scripted_stdin() -> None:
     assert "Turn 1, player A" in out and "legal: lift 1, skip" in out and "A>" in out
     assert "illegal: pole 2 is empty. Turn wasted." in out
     assert "not a move" in out.lower() or "try again" in out.lower()
-    assert "ok, holding 1" in out
+    assert "  took disk 1 from pole 1" in out
     assert "status " in out
 
 

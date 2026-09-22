@@ -13,7 +13,6 @@ player to move has occurred ``repetition_limit`` times.
 
 from __future__ import annotations
 
-import random
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -26,7 +25,7 @@ Status = Literal["won", "unfinished", "stalemate"]
 
 
 class StopGame(Exception):
-    """Raised from inside an agent (or the function it asks) to end the game now.
+    """Raised from inside an agent to end the game now.
 
     ``run`` catches it and returns the game so far as ``unfinished``, so a quit,
     an interrupt, or an abandoned human turn still yields a result that can be
@@ -36,8 +35,7 @@ class StopGame(Exception):
 
 @dataclass(frozen=True)
 class Turn:
-    """One played turn. ``source`` is the agent kind, or ``timeout`` when a
-    fallback agent answered for an external agent."""
+    """One played turn. ``source`` is the label the agent gave its move."""
 
     index: int
     player: Player
@@ -58,7 +56,7 @@ class RunResult:
 # --- schedules -------------------------------------------------------------------
 
 
-def from_string(text: str) -> tuple[Player, ...]:
+def parse_schedule(text: str) -> tuple[Player, ...]:
     """``"ABA"`` -> ``("A", "B", "A")``. Only A and B are allowed."""
     bad = sorted(set(text) - set(PLAYERS))
     if bad:
@@ -66,29 +64,21 @@ def from_string(text: str) -> tuple[Player, ...]:
     return tuple(text)  # type: ignore[return-value]
 
 
-def to_string(schedule: Sequence[Player]) -> str:
-    return "".join(schedule)
-
-
 def repeat(pattern: str, length: int) -> tuple[Player, ...]:
     """Repeat ``pattern`` (e.g. ``"AB"``, ``"AAB"``) to exactly ``length`` entries."""
-    if not pattern:
+    players = parse_schedule(pattern)
+    if not players:
         raise ValueError("schedule pattern must not be empty")
-    players = from_string(pattern)
     return tuple(players[i % len(players)] for i in range(length))
 
 
 def rotate_to(pattern: str, first: Player) -> str:
     """Rotate ``pattern`` so it starts at the first occurrence of ``first``."""
-    from_string(pattern)
+    parse_schedule(pattern)
     if first not in pattern:
         raise ValueError(f"player {first} does not appear in schedule pattern {pattern!r}")
     i = pattern.index(first)
     return pattern[i:] + pattern[:i]
-
-
-def random_schedule(rng: random.Random, length: int) -> tuple[Player, ...]:
-    return tuple(rng.choice(PLAYERS) for _ in range(length))
 
 
 # --- the loop --------------------------------------------------------------------
@@ -96,12 +86,9 @@ def random_schedule(rng: random.Random, length: int) -> tuple[Player, ...]:
 
 def play_turn(state: State, player: Player, agent: Agent, index: int) -> tuple[State, Turn]:
     """Observe -> choose -> step -> record, for one schedule entry."""
-    observation = observe(state, player)
-    legal = legal_actions(state, player)
-    action = agent.choose(observation, legal)
+    action = agent.choose(observe(state, player), legal_actions(state, player))
     new_state, outcome = step(state, player, action)
-    source = "timeout" if agent.last_fell_back else agent.kind
-    return new_state, Turn(index, player, action, outcome, source)
+    return new_state, Turn(index, player, action, outcome, agent.source)
 
 
 def run(
@@ -123,17 +110,18 @@ def run(
     turns: list[Turn] = []
     seen: Counter[tuple[State, Player]] = Counter()
     for i, player in enumerate(schedule):
+        unplayed = len(schedule) - i
         won = winner(state)
         if won is not None:
-            return RunResult(state, tuple(turns), "won", won, len(schedule) - i)
+            return RunResult(state, tuple(turns), "won", won, unplayed)
         if repetition_limit:
             seen[(state, player)] += 1
             if seen[(state, player)] >= repetition_limit:
-                return RunResult(state, tuple(turns), "stalemate", None, len(schedule) - i)
+                return RunResult(state, tuple(turns), "stalemate", None, unplayed)
         try:
             state, turn = play_turn(state, player, agents[player], i + 1)
         except StopGame:
-            return RunResult(state, tuple(turns), "unfinished", None, len(schedule) - i)
+            return RunResult(state, tuple(turns), "unfinished", None, unplayed)
         turns.append(turn)
         if on_turn is not None:
             on_turn(turn, state)

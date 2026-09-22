@@ -22,16 +22,27 @@ Additions (beyond the spec; each can be removed without touching the core):
 Ideas only (not built): web UI, HTTP API, RL wrapper, LLM agent.
 
 ## Architectural Blueprint
-Four rings; a module imports only from rings further in.
+Four rings; dependencies point inward. The table below is the exact rule.
 1. core      — `engine`: the rules. Pure: no I/O, clock, randomness.
 2. play      — `agents`, `runner`: who moves, and the one game loop.
 3. frontends — `recording` (files), `render` (text), `human` (terminal play).
 4. entry     — `cli`: parses arguments and wires rings 1–3. No game logic.
 
+Who may import whom (enforced by `tests/test_architecture.py`):
+
+| module      | may import                         |
+|-------------|------------------------------------|
+| `engine`    | nothing                            |
+| `agents`    | engine                             |
+| `runner`    | engine, agents                     |
+| `recording` | engine, agents, runner             |
+| `render`    | engine, runner                     |
+| `human`     | engine, agents, runner, render     |
+| `cli`       | everything                         |
+
 Where a new feature goes: find the innermost ring that can own it.
 An addition must live in ring 3 or 4; it may not change ring 1.
 Facts are carried forward (e.g. `Outcome.disk`), never recomputed by re-stepping.
-Enforced by: `tests/test_architecture.py` (fails on an outward import).
 
 ## Tech Stack
 Python 3.12, uv, no runtime dependencies. Dev: pytest, ruff, pre-commit.

@@ -2,11 +2,12 @@
 
 from hanoi_crossing.engine import Action, Outcome, State, initial_state, observe
 from hanoi_crossing.render import (
-    describe_outcome,
+    describe_turn,
     render_board,
     render_summary,
     render_trace,
     render_view,
+    result_dict,
 )
 from hanoi_crossing.runner import RunResult, Turn
 
@@ -86,38 +87,39 @@ def test_board_list_style_uses_spec_cross_layout() -> None:
 # --- outcome text, trace, summary ----------------------------------------------------
 
 
-def test_describe_outcome() -> None:
-    ok = Outcome(True, None, None, False)
-    assert describe_outcome(Action("lift", 1), ok, held_after=1) == "ok, holding 1"
-    assert describe_outcome(Action("place", 2), ok, held_after=None, disk=1) == (
-        "ok, placed 1 on pole 2"
-    )
-    assert describe_outcome(Action("skip"), ok) == "skip"
-    bad = Outcome(False, "disk 2 cannot go on disk 1", None, False)
-    assert describe_outcome(Action("place", 2), bad) == (
-        "illegal: disk 2 cannot go on disk 1. Turn wasted."
-    )
-
-
 def _result(turns: list[Turn], status: str = "won", winner: str | None = "A") -> RunResult:
     return RunResult(initial_state(1), tuple(turns), status, winner, 0)  # type: ignore[arg-type]
 
 
-def _turn(i: int, p: str, a: Action, legal: bool = True, source: str = "random") -> Turn:
-    out = Outcome(legal, None if legal else "hand is empty", None, False)
+def _turn(
+    i: int, p: str, a: Action, legal: bool = True, source: str = "random", disk: int | None = 1
+) -> Turn:
+    out = Outcome(legal, None if legal else "hand is empty", None, False, disk if legal else None)
     return Turn(i, p, a, out, source)  # type: ignore[arg-type]
+
+
+def test_describe_turn_says_what_moved_and_where() -> None:
+    assert describe_turn(_turn(1, "A", Action("lift", 1))) == "took disk 1 from pole 1"
+    assert describe_turn(_turn(1, "B", Action("lift", 2))) == "took disk 1 from the shared pole"
+    assert describe_turn(_turn(1, "A", Action("place", 2), disk=3)) == (
+        "put disk 3 on the shared pole"
+    )
+    assert describe_turn(_turn(1, "A", Action("skip"), disk=None)) == "skip"
+    assert describe_turn(_turn(1, "A", Action("place", 3), legal=False)) == (
+        "illegal: hand is empty. Turn wasted."
+    )
 
 
 def test_trace_marks_sources_only_when_relevant() -> None:
     same = [_turn(1, "A", Action("lift", 1)), _turn(2, "B", Action("skip"))]
-    text = render_trace(same, n=1)
+    text = render_trace(same)
     assert "[random]" not in text
-    assert text.splitlines()[0].startswith("1 A lift 1")
+    assert text.splitlines() == ["1 A lift 1 → took disk 1 from pole 1", "2 B skip"]
     mixed = [_turn(1, "A", Action("lift", 1), source="human"), _turn(2, "B", Action("skip"))]
-    text = render_trace(mixed, n=1)
+    text = render_trace(mixed)
     assert "[human]" in text.splitlines()[0] and "[random]" in text.splitlines()[1]
     timed = [_turn(1, "A", Action("lift", 1), source="timeout")]
-    assert "[timeout]" in render_trace(timed, n=1)
+    assert "[timeout]" in render_trace(timed)
 
 
 def test_summary_counts() -> None:
@@ -134,3 +136,19 @@ def test_summary_counts() -> None:
     assert render_summary(_result([], "unfinished", None)).startswith(
         "status unfinished · winner -"
     )
+
+
+def test_result_dict_is_plain_json_data() -> None:
+    data = result_dict(_result([_turn(1, "A", Action("lift", 1))]))
+    assert data["status"] == "won" and data["winner"] == "A"
+    assert data["counts"]["played"] == 1
+    assert data["turns"] == [
+        {
+            "index": 1,
+            "player": "A",
+            "action": "lift 1",
+            "legal": True,
+            "reason": None,
+            "source": "random",
+        }
+    ]
