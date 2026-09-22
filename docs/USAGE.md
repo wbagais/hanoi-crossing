@@ -21,6 +21,8 @@ uv run hanoi recordings [--dir DIR]
 | `--seed S` | optional | `0` | Seeds the random players (and the random fallback for humans). Same seed, same game. Pass any other integer for a different game. |
 | `--max-turns N` | optional | `200 · 3ⁿ` | Schedule length; reaching it ends the game as `unfinished`. The default follows measured random play: 600, 1 800, 5 400, 16 200, 48 600 for N = 1..5. For `replay` it is the length of the continuation. |
 | `--repetition-limit K` | optional | off (`0`) | End as `stalemate` when the same position with the same player to move has occurred K times. Off by default because random players revisit positions by chance, not by choice. For `replay` it applies to the continuation. |
+| `--save FILE` | optional | autosave | Write the recording to `FILE` instead of the autosave name. For `replay` it names the continued game. |
+| `--no-save` | optional | off | Do not write a recording. |
 
 `recordings` takes none of the game flags.
 
@@ -53,8 +55,6 @@ command so the spec's mode is visible by name.
 | `--first A\|B` | optional | `A` | Who takes turn 1. Rotates the schedule pattern to that player's first occurrence: `AB` → `BA`, `AAB` → `BAA`. Error (exit 2) if the pattern has no such player. |
 | `--schedule P` | optional | `AB` | Turn-order pattern, letters A and B only, repeated to fill `--max-turns`. `AAB` gives A two turns then B one; `A` lets A play alone. Printed before turn 1. |
 | `--no-skip` | optional | off | Random players never choose skip unless it is the only legal action. |
-| `--save FILE` | optional | autosave | Write the recording to `FILE` instead of the autosave name. |
-| `--no-save` | optional | off | Do not write a recording. |
 
 Autosave: every finished game, whatever its status, is written once at the end to
 `recordings/<date>-<time>-<mode>-n<N>-seed<S>.json`, and the path is printed. The

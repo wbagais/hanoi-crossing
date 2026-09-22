@@ -33,9 +33,9 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D25 | Engine size | Engine | 🟦 spec (C1) | active |
 | D5 | Agent contract | Agents and runner | 🟦 spec (T8) | active |
 | D6 | One runner | Agents and runner | 🟪 engineering | active |
-| D9 | External agent with timeout, fallback, move source | Agents and runner | 🟩 addition (A1, A2) | active |
-| D26 | Agents carry `kind` and `last_fell_back` | Agents and runner | 🟩 addition (A2) | active |
-| D27 | The injected `ask` owns the waiting | Agents and runner | 🟩 addition (A1) | active |
+| D9 | External agent with timeout, fallback, move source | Agents and runner | 🟩 addition (A1, A2) | superseded by D48 |
+| D26 | Agents carry `kind` and `last_fell_back` | Agents and runner | 🟩 addition (A2) | superseded by D47 |
+| D27 | The injected `ask` owns the waiting | Agents and runner | 🟩 addition (A1) | superseded by D48 |
 | D28 | Stalemate counts (state, player) pairs | Agents and runner | 🟨 interpretation (I5) | active |
 | D29 | Status checked before each entry and after the loop | Agents and runner | 🟪 engineering | active |
 | D32 | `run` gains `on_turn` | Agents and runner | 🟩 addition (A1) | active |
@@ -57,7 +57,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D42 | Repetition limit off by default | CLI | 🟨 interpretation (I5) | active |
 | D17 | Drawn towers by default | Output | 🟦 spec (T9) | active |
 | D38 | Full game trace by default | Output | 🟪 engineering | superseded by D40 |
-| D39 | Bot turns spell out their effect | Output | 🟩 addition (A5) | active |
+| D39 | Bot turns spell out their effect | Output | 🟩 addition (A5) | extended by D49 |
 | D40 | Default output is the final state only | Output | 🟪 engineering | active |
 | D10 | Tooling | Process | 🟦 spec (C2) | active |
 | D11 | TDD visible in git | Process | 🟦 spec (S1) | active |
@@ -67,6 +67,10 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D20 | Scope beyond the spec | Scope | 🟦 spec (S3) | active |
 | D45 | Four rings; restructure, keep every feature | Structure | 🟪 engineering | active |
 | D46 | `Outcome` carries the moved disk; `Action` owns its text | Structure | 🟪 engineering | active |
+| D47 | One `source` label per agent | Structure | 🟩 addition (A2) | active |
+| D48 | Human play is its own frontend module | Structure | 🟩 addition (A1) | active |
+| D49 | One wording for what a turn did | Structure | 🟩 addition (A5) | active |
+| D50 | Recording owns its files; CLI only wires | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -183,7 +187,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 - **Rejected:** a "game type" concept (loses mixed agents; RL needs a learning agent
   versus a fixed opponent).
 
-### D9. External agent with timeout, fallback, move source
+### D9. External agent with timeout, fallback, move source (superseded by D48)
 - **Context:** a human who walks away must not hang the game; output should show
   who chose each move.
 - **Choice:** `ExternalAgent(ask, timeout, fallback)`; the injected `ask` owns the
@@ -192,7 +196,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 - **Reason:** the same class serves a keyboard, a UI, or a model.
 - **Rejected:** a human-only agent class (the RL or LLM case is the same shape).
 
-### D26. Agents carry `kind` and `last_fell_back`
+### D26. Agents carry `kind` and `last_fell_back` (superseded by D47)
 - **Context:** `Turn.source` must be known without changing the `choose` signature
   an RL policy would implement.
 - **Choice:** two attributes on the agent; the runner reads them after `choose`
@@ -201,7 +205,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 - **Rejected:** `choose` returning an `(action, source)` pair (leaks a display
   concern into the agent contract).
 
-### D27. The injected `ask` owns the waiting
+### D27. The injected `ask` owns the waiting (superseded by D48)
 - **Context:** the CLI waits on stdin, a UI on a request deadline, tests on a fake.
 - **Choice:** `ExternalAgent.choose` passes the timeout to `ask` and reacts to a
   `Timeout` exception or a `None` return. No clock, thread, or `input()` in
@@ -466,3 +470,46 @@ Each entry has the same four parts: **Context** (what raised the question),
 - **Reason:** carry facts forward instead of recomputing them; one source of truth.
 - **Rejected:** a separate text-format module (the action's text is part of the
   action space an RL or network client uses).
+
+### D47. One `source` label per agent
+- **Context:** D26 gave agents two attributes, and the runner combined them into
+  `Turn.source`: display bookkeeping inside the core loop.
+- **Choice:** an agent has one attribute, `source`, the label of the move it just
+  chose; the runner copies it. `HumanAgent` sets `timeout` when its fallback moved.
+- **Reason:** the agent knows who chose; the runner should not decide it.
+- **Rejected:** `choose` returning `(action, source)` (still leaks into the contract
+  an RL policy implements).
+
+### D48. Human play is its own frontend module
+- **Context:** the prompt, the threaded stdin reader, quit handling, and timeout
+  counting sat in `cli.py`, while `ExternalAgent` and `Timeout` sat in the core
+  `agents.py` although only human play used them.
+- **Choice:** `human.py` holds `LineReader`, `Console` (prompts in, turn lines out),
+  and `HumanAgent` (prompt, re-prompt, fallback on timeout, `StopGame`). `agents.py`
+  keeps only `RandomAgent` and `ScriptedAgent`.
+- **Reason:** an addition lives in the frontend ring and can be removed without
+  touching the core; one class replaces `ExternalAgent` + the `ask` callback + the
+  prompt object.
+- **Rejected:** keeping a generic injected-`ask` agent for a future UI or LLM (not
+  built; such an agent is one small class when it is).
+
+### D49. One wording for what a turn did
+- **Context:** three texts described a turn: `ok, holding 1` after a human move,
+  `lift 2 → took disk 1 from the shared pole` for bots, and the trace, each derived
+  differently.
+- **Choice:** `render.describe_turn` (`took disk 1 from pole 1`, `put disk 3 on the
+  shared pole`, `illegal: … Turn wasted.`) is used by the trace, bot lines, and human
+  feedback; it reads `Outcome.disk` (D46).
+- **Reason:** one source of truth; shared-pole events read the same everywhere.
+- **Rejected:** keeping `ok, holding N` for humans (a second phrasing of the same fact).
+
+### D50. Recording owns its files; CLI only wires
+- **Context:** autosave naming, the seed-from-file-name regex, and gluing a continued
+  game onto its recording were in `cli.py`; recordings stored moves as text and
+  re-parsed them on every use.
+- **Choice:** `recording.py` gains `autosave_path`, `seed_in_name`, `append_run`;
+  `Recording.moves` are `Action`s, converted to text only in `loads`/`dumps`, and
+  validation lives only in `Recording`. The CLI builds agents, calls the runner, and
+  prints; `--save`/`--no-save` now also apply to a continued replay.
+- **Reason:** each concern in the module that owns it; `cli.py` 498 → 280 lines.
+- **Rejected:** a separate `files.py` (one more module for three small functions).

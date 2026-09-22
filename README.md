@@ -16,7 +16,7 @@ under [Future work](#future-work) and deliberately not built.
 
 ```bash
 uv sync
-uv run pytest                                  # 195 tests
+uv run pytest                                  # 209 tests
 uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
 uv run hanoi random --n 3 --seed 7 --trace     # two random players, every turn shown
 uv run hanoi play --a human --b random --n 2   # you against a random player
@@ -148,6 +148,27 @@ Every decision, with its reason and the alternatives rejected, is numbered in
 from: 🟦 required by the spec, 🟨 our reading of a silent rule, 🟪 an engineering
 choice within scope, 🟩 an addition beyond the spec. The short version:
 
+### Structure
+
+Four rings; dependencies point inward, and `tests/test_architecture.py` fails on
+any import the table in [`CLAUDE.md`](CLAUDE.md) does not allow (D45).
+
+```mermaid
+flowchart LR
+  cli --> human & recording & render
+  human --> render & agents
+  recording --> runner
+  render --> runner
+  runner --> agents --> engine
+```
+
+1. **core**: `engine`, the rules, pure.
+2. **play**: `agents` and `runner`, who moves and the one loop.
+3. **frontends**: `recording` (files), `render` (text), `human` (terminal play).
+4. **entry**: `cli`, arguments and wiring only.
+
+Additions beyond the spec live in rings 3 and 4 and never change the engine.
+
 ### Interpretations
 
 Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
@@ -166,7 +187,7 @@ Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
 7. **Ownership is not tracked after setup.** Any player may lift any top disk from
    pole 2 and build with it; the win condition never mentions whose disks they are.
 
-### Engine (`engine.py`, 267 lines)
+### Engine (`engine.py`, 281 lines)
 
 Pure functions over an immutable `State`. No I/O, no randomness, no turn counter,
 no stored "finished" flag: `winner(state)` is recomputed from the board.
@@ -190,10 +211,11 @@ content, which is what makes stalemate detection a `Counter` lookup.
 An agent answers one question, "how is a move chosen": it receives an `Observation`
 and the legal actions and returns an `Action`. It never sees the full state. This is
 the contract an RL policy, an LLM, or a network client would implement; the random
-agent proves it works. Three kinds: `RandomAgent` (seeded), `ScriptedAgent` (replays
-recorded moves verbatim, illegal ones included), `ExternalAgent` (asks an injected
-function and falls back to another agent on timeout). Any agent can play either
-side, so all nine combinations work and are tested.
+agent proves it works. Two kinds live here: `RandomAgent` (seeded) and
+`ScriptedAgent` (replays recorded moves verbatim, illegal ones included). Each labels
+its moves with a `source` that the runner copies onto the turn. A person at the
+keyboard is `HumanAgent` in `human.py`, a frontend: it prompts, and on timeout lets a
+fallback agent move for them (labelled `timeout`). Any agent can play either side.
 
 ### One runner (`runner.py`)
 
@@ -302,13 +324,15 @@ docs/USAGE.md         every command, flag, default, exit code
 plans/PLAN.md         the stage plan, traceability table, status per stage
 examples/             six recordings, each showing one rule; all pinned by tests
 src/hanoi_crossing/
-  engine.py           rules (267 lines, guarded by a test at < 500)
-  agents.py           Random / Scripted / External agents
+  engine.py           rules (281 lines, guarded by a test at < 500)
+  agents.py           Random / Scripted agents
   runner.py           play_turn, run, schedules
-  recording.py        JSON format
-  render.py           towers, lists, trace, summary
-  cli.py              the hanoi command
-tests/                195 tests; the engine is tested directly, the CLI through main()
+  recording.py        JSON format, recording files, replay
+  render.py           towers, lists, turn lines, summary, JSON result
+  human.py            terminal play: console, human agent, timeouts
+  cli.py              the hanoi command: arguments and wiring only
+tests/                209 tests; the engine is tested directly, the CLI through main();
+                      test_architecture.py enforces the import table in CLAUDE.md
 ```
 
 ```bash
@@ -338,6 +362,12 @@ decision log records which.
   output, bot turn lines, the `--max-turns` formula measured from random play, the
   repetition limit made opt-in, and ways to end a game early. D38–D44, two of them
   reversing earlier choices.
+- **Restructure after review:** the review said the code was not cleanly
+  abstracted. With Claude Code (Claude Opus 5) the author kept every feature and
+  reorganised the modules into four rings: human play moved out of the CLI into
+  `human.py`, the engine now reports which disk moved, duplicated formatting and
+  checks collapsed to one place each, and a test enforces the import rules.
+  D45–D50.
 
 ### Journey
 
