@@ -65,6 +65,8 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D37 | README structure | Documentation | 🟦 spec (T11) | active |
 | D19 | Interfaces and their purposes | Scope | 🟦 spec (T5, T6) | active |
 | D20 | Scope beyond the spec | Scope | 🟦 spec (S3) | active |
+| D45 | Four rings; restructure, keep every feature | Structure | 🟪 engineering | active |
+| D46 | `Outcome` carries the moved disk; `Action` owns its text | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -439,3 +441,28 @@ Each entry has the same four parts: **Context** (what raised the question),
   ending. Describe but do not build: web UI + HTTP API, RL wrapper, LLM agent.
 - **Reason:** the ~2 hour budget; stages 0–3 are a complete submission on their own.
 - **Rejected:** building the web UI first (not asked for; would eat the budget).
+
+## Structure
+
+### D45. Four rings; restructure, keep every feature
+- **Context:** review feedback: the code was not cleanly abstracted. Additions had
+  been attached to the nearest module: five of ten features had logic in `cli.py`
+  (498 lines, bigger than the engine), `recording` imported the runner, `render`
+  re-stepped whole games.
+- **Choice:** keep every feature; reorganise into four rings, each importing only
+  inward: core (`engine`), play (`agents`, `runner`), frontends (`recording`,
+  `render`, `human`), entry (`cli`). Additions live in rings 3–4 and may not change
+  ring 1. The blueprint is in `CLAUDE.md`.
+- **Reason:** the problem was structure, not scope; one rule tells where anything goes.
+- **Rejected:** cutting back to the spec's two modes (hides the problem instead of
+  fixing it).
+
+### D46. `Outcome` carries the moved disk; `Action` owns its text
+- **Context:** three places worked out which disk moved (one replayed the game), and
+  action text was formatted in two modules and parsed in a third.
+- **Choice:** `Outcome.disk` is the disk lifted or placed; `str(action)` and
+  `Action.parse(text)` live on `Action`. `SIDES` is the one table of each player's
+  pole keys; `is_positive_int` the one integer check.
+- **Reason:** carry facts forward instead of recomputing them; one source of truth.
+- **Rejected:** a separate text-format module (the action's text is part of the
+  action space an RL or network client uses).
