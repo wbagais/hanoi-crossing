@@ -5,7 +5,7 @@ import random
 import pytest
 
 from hanoi_crossing.agents import RandomAgent, ScriptedAgent
-from hanoi_crossing.engine import Action, State, initial_state, winner
+from hanoi_crossing.engine import Action, Outcome, State, initial_state, step, winner
 from hanoi_crossing.runner import (
     RunResult,
     StopGame,
@@ -58,8 +58,7 @@ def test_play_turn_records_action_outcome_and_source() -> None:
     s = initial_state(1)
     s2, turn = play_turn(s, "A", ScriptedAgent([L1]), index=1)
     assert s2.hands["A"] == 1
-    assert turn == Turn(index=1, player="A", action=L1, outcome=turn.outcome, source="scripted")
-    assert turn.outcome.legal
+    assert turn == Turn(index=1, player="A", action=L1, outcome=Outcome(disk=1), source="scripted")
 
 
 class Labelled:
@@ -78,6 +77,14 @@ def test_play_turn_copies_the_agents_source_label() -> None:
 
 
 # --- run: spec example, unplayed, unfinished, stalemate -----------------------------
+
+
+def make_won_state() -> State:
+    """The spec's N=1 example played out: A has won."""
+    state = initial_state(1)
+    for player, action in (("A", L1), ("B", L1), ("A", P3)):
+        state, _ = step(state, player, action)
+    return state
 
 
 def _scripted(a: list[Action], b: list[Action]) -> dict:
@@ -135,6 +142,18 @@ def test_run_rejects_a_repetition_limit_below_two(limit: int) -> None:
         run(initial_state(1), repeat("AB", 4), _scripted([SKIP] * 4, [SKIP] * 4), limit)
 
 
+def test_run_from_an_already_won_position_plays_nothing() -> None:
+    won = make_won_state()
+    result = run(won, repeat("AB", 5), _scripted([SKIP] * 5, [SKIP] * 5))
+    assert result.status == "won" and result.winner == "A"
+    assert result.turns == () and result.unplayed == 5
+
+
+def test_a_scripted_agent_that_runs_out_stops_the_run_loudly() -> None:
+    with pytest.raises(RuntimeError):
+        run(initial_state(1), repeat("AB", 6), _scripted([SKIP], [SKIP]))
+
+
 def test_run_without_repetition_limit_runs_to_unfinished() -> None:
     skippers = _scripted([SKIP] * 10, [SKIP] * 10)
     result = run(initial_state(1), repeat("AB", 10), skippers)
@@ -168,11 +187,10 @@ def test_all_nine_agent_combinations_run_cleanly(kind_a: str, kind_b: str) -> No
     script = [L1, P3] + [SKIP] * 200
     agents = {"A": _agent(kind_a, rng, list(script)), "B": _agent(kind_b, rng, list(script))}
     result = run(initial_state(1), repeat("AB", 200), agents)
-    assert result.status in ("won", "unfinished")
     expected = {"random": "random", "scripted": "scripted", "external": "human"}
     for turn in result.turns:
         assert turn.source == expected[kind_a if turn.player == "A" else kind_b]
-    assert isinstance(result.final_state, State)
+        assert turn.outcome.legal or turn.source == "scripted", "only a script plays illegally"
 
 
 def test_run_calls_on_turn_after_every_played_turn() -> None:

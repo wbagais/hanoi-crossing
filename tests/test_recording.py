@@ -53,6 +53,13 @@ def test_load_and_dump_files(tmp_path) -> None:  # noqa: ANN001
     assert load("examples/spec_n1.json") == rec
 
 
+def test_load_rejects_a_file_that_is_not_utf8_text(tmp_path) -> None:  # noqa: ANN001
+    path = tmp_path / "bytes.json"
+    path.write_bytes(b"\xff" + json.dumps(SPEC).encode())  # valid JSON behind one bad byte
+    with pytest.raises(RecordingFormatError):
+        load(path)
+
+
 def _with(**changes: object) -> str:
     d = dict(SPEC)
     d.update(changes)
@@ -68,6 +75,12 @@ def _with(**changes: object) -> str:
         _with(n=0),
         _with(n="1"),
         _with(turn_order="ABC"),
+        _with(turn_order=5),
+        _with(turn_order=["A", "B", "A"]),
+        _with(moves="lift 1"),
+        _with(moves=5),
+        _with(sources="human"),
+        _with(sources=5),
         _with(turn_order="AB"),  # length mismatch
         _with(moves=["lift 1", "lift 1", "jump 3"]),
         _with(moves=["lift 1", "lift 1", "place 9"]),

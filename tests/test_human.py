@@ -2,6 +2,7 @@
 
 import io
 import random
+import threading
 
 import pytest
 
@@ -31,6 +32,22 @@ def test_typed_move_is_returned_after_re_prompting_on_garbage() -> None:
 def test_end_of_input_lets_the_fallback_move_and_labels_it_timeout() -> None:
     action, agent, _ = _ask("")
     assert action == Action("skip") and agent.source == "timeout"
+
+
+def test_line_reader_gives_up_when_no_line_arrives() -> None:
+    typing = threading.Event()  # a stdin nobody types into, until we let it end
+
+    class SilentStream(io.StringIO):
+        def __iter__(self):  # noqa: ANN204
+            typing.wait(5)
+            return iter([])
+
+    reader = LineReader(SilentStream())
+    try:
+        with pytest.raises(TimeoutError):
+            reader.get(0.05)
+    finally:
+        typing.set()
 
 
 class _NeverAnswers(LineReader):
