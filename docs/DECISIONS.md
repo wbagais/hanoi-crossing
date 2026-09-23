@@ -77,6 +77,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D54 | `Outcome` keeps only what it cannot derive | Structure | 🟪 engineering | active |
 | D55 | Nothing is kept for a caller that does not exist | Structure | 🟪 engineering | active |
 | D56 | The board style is a boolean, not a string | Structure | 🟪 engineering | active |
+| D57 | Review pass: bad input fails as an error, not a traceback | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -552,3 +553,20 @@ feature was kept; what changed is where each one lives.
   console and compared against literals in four places, where a typo would silently
   fall back to towers; and both commands built their random agents by hand.
 - **Rejected:** an enum (two values, one flag: a bool is the honest type).
+
+### D57. Review pass: bad input fails as an error, not a traceback
+- **Context:** three reviewers went file by file over the restructured code.
+- **Choice:** fixed what they found. Rules and loop: a repetition limit below 2 is
+  rejected instead of declaring an instant stalemate; `State` and `Observation` hold
+  read-only mappings, so a "frozen" board can no longer change its hash or let an
+  agent edit its own view; `Action` rejects `True` as a pole. Files and text: a
+  recording whose `sources` are not strings, or whose bytes are not UTF-8, or whose
+  path is a directory, is reported as an invalid recording (exit 1) instead of a
+  traceback; the list board no longer mistakes disk 2 on pole 1b for the shared-pole
+  label; tower columns stay aligned once disks reach two digits. CLI: `--max-turns`
+  below 1 is an argument error, and every error message follows the console, so
+  `--json` keeps stdout to one object.
+- **Reason:** untrusted input reaches the recording reader and the board renderer;
+  each of these ended a run with a stack trace or silently wrong output.
+- **Rejected:** a cap on `n` in a recording (a huge `n` makes replay slow, but the
+  file is the user's own, and a cap would be an arbitrary game limit).

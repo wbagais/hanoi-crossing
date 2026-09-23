@@ -15,7 +15,7 @@ uv run hanoi recordings [--dir DIR]
 
 | Flag | Required | Default | What it does |
 |---|---|---|---|
-| `--json` | optional | off | Print one JSON object instead of text: `n`, `seed`, `schedule`, `status`, `winner`, `state` (the engine's `to_dict`), `counts`, `turns` (index, player, action, legal, reason, source), `saved`. Also disables every prompt. |
+| `--json` | optional | off | Print one JSON object instead of text: `n`, `seed`, `schedule`, `status`, `winner`, `state` (the engine's `to_dict`), `counts`, `turns` (index, player, action, legal, reason, source), `saved`, plus `file` and `continued` when replaying. Everything else, including a human's prompts and any error message, goes to stderr, so stdout stays one object. Replay never asks whether to continue. |
 | `--list` | optional | off | Show poles as bracket lists in the spec's cross layout instead of drawn towers. |
 | `--trace` | optional | off | Print the full game before the final board: one line per turn, `index player action → result [source]`. |
 | `--seed S` | optional | `0` | Seeds the random players (and the random fallback for humans). Same seed, same game. Pass any other integer for a different game. |
@@ -104,7 +104,8 @@ winner, modification time. Status comes from replaying the file. Prints
 |---|---|
 | 0 | Normal, whatever the game's status. |
 | 1 | The recording file is missing or invalid; the message names the problem. |
-| 2 | Bad arguments, including `--first` naming a player absent from `--schedule`. |
+| 2 | Bad arguments, including `--first` naming a player absent from `--schedule`, or `--max-turns` below 1. |
+| 130 | Interrupted with Ctrl-C outside a player's prompt. |
 
 ## Game end statuses
 

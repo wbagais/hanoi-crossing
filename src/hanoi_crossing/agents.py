@@ -25,7 +25,7 @@ class RandomAgent:
     def choose(self, observation: Observation, legal: Sequence[Action]) -> Action:
         if not legal:
             raise RuntimeError("no legal actions to choose from")
-        return self.rng.choice(list(legal))
+        return self.rng.choice(legal)
 
 
 class ScriptedAgent:

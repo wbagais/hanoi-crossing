@@ -7,7 +7,7 @@ an RL loop or a multi-game service; the CLI replays recordings and plays random 
 
 ## Features
 Spec (required):
-- Rules engine: step, legal actions, observation, winner, state to/from dict
+- Rules engine: step, legal actions, observation, winner, board as JSON data
 - `replay`: re-play a recording file, print the final state
 - `random`: two random players, seeded, any turn-order pattern
 

@@ -12,7 +12,7 @@ import time
 from collections.abc import Sequence
 from typing import IO, Any
 
-from .engine import Action, Observation, State
+from .engine import Action, Observation
 from .render import describe_turn, move_text, render_view
 from .runner import StopGame, Turn
 
@@ -60,12 +60,15 @@ class Console:
         self.chat.write(text + "\n")
 
     def prompt(self, text: str, timeout: float | None = None) -> str | None:
-        """Show ``text`` without a newline and read one line (None at end of input)."""
+        """Show ``text`` without a newline and read one line.
+
+        None at end of input; raises ``TimeoutError`` when ``timeout`` runs out.
+        """
         self.chat.write(text)
         self.chat.flush()
         return self.reader.get(timeout)
 
-    def on_turn(self, turn: Turn, state: State) -> None:
+    def on_turn(self, turn: Turn) -> None:
         """Runner callback: print each turn as it happens."""
         self.turns_played = turn.index
         if turn.source == "human":

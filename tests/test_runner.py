@@ -129,6 +129,12 @@ def test_run_stalemate_on_repeated_position() -> None:
     assert len(result.turns) == 4 and result.unplayed == 6
 
 
+@pytest.mark.parametrize("limit", [1, -3])
+def test_run_rejects_a_repetition_limit_below_two(limit: int) -> None:
+    with pytest.raises(ValueError):
+        run(initial_state(1), repeat("AB", 4), _scripted([SKIP] * 4, [SKIP] * 4), limit)
+
+
 def test_run_without_repetition_limit_runs_to_unfinished() -> None:
     skippers = _scripted([SKIP] * 10, [SKIP] * 10)
     result = run(initial_state(1), repeat("AB", 10), skippers)
@@ -169,14 +175,14 @@ def test_all_nine_agent_combinations_run_cleanly(kind_a: str, kind_b: str) -> No
     assert isinstance(result.final_state, State)
 
 
-def test_run_calls_on_turn_after_each_turn_with_the_new_state() -> None:
-    seen: list[tuple[int, str, bool]] = []
+def test_run_calls_on_turn_after_every_played_turn() -> None:
+    seen: list[tuple[int, str, str]] = []
 
-    def on_turn(turn: Turn, state: State) -> None:
-        seen.append((turn.index, turn.player, state.hands[turn.player] is not None))
+    def on_turn(turn: Turn) -> None:
+        seen.append((turn.index, turn.player, str(turn.action)))
 
     run(initial_state(1), parse_schedule("ABA"), _scripted([L1, P3], [L1]), on_turn=on_turn)
-    assert seen == [(1, "A", True), (2, "B", True), (3, "A", False)]
+    assert seen == [(1, "A", "lift 1"), (2, "B", "lift 1"), (3, "A", "place 3")]
 
 
 def test_stop_game_raised_by_an_agent_ends_the_run_as_unfinished() -> None:

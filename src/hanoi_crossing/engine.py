@@ -8,6 +8,7 @@ docs/DECISIONS.md.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 PLAYERS = ("A", "B")
 VERBS = ("lift", "place", "skip")
@@ -45,7 +46,8 @@ class Action:
         if self.verb == "skip":
             check(self.pole is None, "skip takes no pole")
         else:
-            check(self.pole in POLES, f"pole must be 1, 2 or 3, got {self.pole!r}")
+            ok = is_positive_int(self.pole) and self.pole in POLES
+            check(ok, f"pole must be 1, 2 or 3, got {self.pole!r}")
 
     def __str__(self) -> str:
         return self.verb if self.pole is None else f"{self.verb} {self.pole}"
@@ -82,8 +84,9 @@ class State:
     hands: Mapping[str, int | None]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "poles", {k: tuple(v) for k, v in self.poles.items()})
-        object.__setattr__(self, "hands", dict(self.hands))
+        poles = {k: tuple(v) for k, v in self.poles.items()}
+        object.__setattr__(self, "poles", MappingProxyType(poles))
+        object.__setattr__(self, "hands", MappingProxyType(dict(self.hands)))
 
     def __hash__(self) -> int:
         return hash(
@@ -101,6 +104,9 @@ class Observation:
 
     poles: Mapping[int, tuple[int, ...]]
     hand: int | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "poles", MappingProxyType(dict(self.poles)))
 
 
 @dataclass(frozen=True)
@@ -192,7 +198,7 @@ def legal_actions(state: State, player: str) -> list[Action]:
 
 
 def step(state: State, player: str, action: Action) -> tuple[State, Outcome]:
-    """Apply one action: over? -> malformed? -> illegal here? -> apply -> who won?
+    """Apply one action: malformed? -> over? -> illegal here? -> apply -> who won?
 
     An illegal action returns the very same ``state`` object, so a wasted turn is
     cheap to detect (R9).

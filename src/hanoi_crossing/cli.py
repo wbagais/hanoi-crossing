@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from .agents import RandomAgent
-from .engine import State, initial_state
+from .engine import State, check, initial_state
 from .human import Console, HumanAgent, LineReader
 from .recording import (
     Recording,
@@ -48,7 +48,7 @@ def default_max_turns(n: int) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """Four subcommands over four groups of shared flags."""
     output = argparse.ArgumentParser(add_help=False)  # every command
-    output.add_argument("--json", action="store_true", help="machine-readable output; no prompts")
+    output.add_argument("--json", action="store_true", help="one JSON object; console to stderr")
     output.add_argument("--list", action="store_true", help="bracket lists instead of towers")
     output.add_argument("--trace", action="store_true", help="one line per turn before the board")
     output.add_argument("--seed", type=int, default=0, help="seed for random agents (default 0)")
@@ -67,8 +67,12 @@ def build_parser() -> argparse.ArgumentParser:
     human = argparse.ArgumentParser(add_help=False)  # only where a person can play
     human.add_argument("--a", choices=("random", "human"), required=True, help="A's moves")
     human.add_argument("--b", choices=("random", "human"), required=True, help="B's moves")
-    human.add_argument("--move-timeout", type=float, default=30, help="seconds per human move")
-    human.add_argument("--max-timeouts", type=int, default=3, help="end after K silent prompts")
+    human.add_argument(
+        "--move-timeout", type=float, default=30, help="seconds a human has; 0 = off"
+    )
+    human.add_argument(
+        "--max-timeouts", type=int, default=3, help="end after K silent prompts; 0 = never"
+    )
 
     parser = argparse.ArgumentParser(prog="hanoi", description="Hanoi Crossing")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -76,15 +80,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_replay = sub.add_parser("replay", parents=[output, game], help="re-play a recording")
     p_replay.add_argument("file", metavar="FILE")
     choice = p_replay.add_mutually_exclusive_group()
-    choice.add_argument("--continue", dest="cont", action="store_true")
-    choice.add_argument("--no-continue", dest="no_cont", action="store_true")
+    finish = "an unfinished recording with random players"
+    choice.add_argument("--continue", dest="cont", action="store_true", help=f"finish {finish}")
+    choice.add_argument("--no-continue", dest="no_cont", action="store_true", help="never ask")
 
     sub.add_parser("random", parents=[output, game, fresh], help="two random players")
 
     sub.add_parser("play", parents=[output, game, fresh, human], help="any mix of players")
 
     p_rec = sub.add_parser("recordings", parents=[output], help="list saved games")
-    p_rec.add_argument("--dir", default=str(RECORDINGS))
+    p_rec.add_argument("--dir", default=str(RECORDINGS), help="folder to list (default recordings)")
     return parser
 
 
@@ -101,7 +106,8 @@ def _play(
 ) -> tuple[RunResult, str]:
     """Run a fresh schedule from ``start``; returns the result and the pattern used."""
     pattern = rotate_to(args.schedule, first)  # ValueError -> exit 2 in main
-    max_turns = args.max_turns or default_max_turns(start.n)
+    check(args.max_turns is None or args.max_turns >= 1, "--max-turns must be 1 or more")
+    max_turns = default_max_turns(start.n) if args.max_turns is None else args.max_turns
     console.say(f"{title}  seed={args.seed}  schedule={pattern} (repeats, max {max_turns} turns)")
     live = any(isinstance(a, HumanAgent) for a in agents.values())
     result = run(
@@ -123,7 +129,12 @@ def _save(args: argparse.Namespace, rec: Recording, mode: str) -> Path | None:
 
 
 def _report(
-    args: argparse.Namespace, out: IO[str], result: RunResult, meta: dict, saved: Path | None
+    args: argparse.Namespace,
+    out: IO[str],
+    console: Console,
+    result: RunResult,
+    meta: dict,
+    saved: Path | None,
 ) -> None:
     if args.json:
         payload = {**meta, **result_dict(result), "saved": str(saved) if saved else None}
@@ -131,7 +142,7 @@ def _report(
         return
     if args.trace and result.turns:
         out.write("\n" + render_trace(result.turns) + "\n")
-    out.write("\n" + render_board(result.final_state, args.list) + "\n")
+    out.write("\n" + render_board(result.final_state, console.as_list) + "\n")
     out.write("\n" + render_summary(result) + "\n")
     if saved:
         out.write(f"saved: {saved}\n")
@@ -165,7 +176,9 @@ def cmd_game(
     result, pattern = _play(args, console, initial_state(args.n), agents, args.first, title)
     mode = "random" if set(kinds.values()) == {"random"} else "play"
     saved = _save(args, from_run(args.n, result), mode)
-    _report(args, out, result, {"n": args.n, "seed": args.seed, "schedule": pattern}, saved)
+    _report(
+        args, out, console, result, {"n": args.n, "seed": args.seed, "schedule": pattern}, saved
+    )
     return EXIT_OK
 
 
@@ -174,17 +187,17 @@ def cmd_replay(args: argparse.Namespace, out: IO[str], console: Console, isatty:
     try:
         rec = load(args.file)
     except (OSError, RecordingFormatError) as e:
-        out.write(f"error: cannot replay {args.file}: {e}\n")
+        console.say(f"error: cannot replay {args.file}: {e}")
         return EXIT_BAD_FILE
     console.say(f"Hanoi Crossing  replay {args.file}  n={rec.n}  recorded turns={len(rec.moves)}")
     result = replay(rec)
     meta = {"n": rec.n, "seed": args.seed, "schedule": rec.turn_order, "file": args.file}
     if result.status != "unfinished" or not _wants_continue(args, console, isatty):
-        _report(args, out, result, meta, None)
+        _report(args, out, console, result, meta, None)
         return EXIT_OK
 
     if not args.json:
-        _report(args, out, result, meta, None)  # the recorded part, before continuing
+        _report(args, out, console, result, meta, None)  # the recorded part, before continuing
     agents = _agents(args, console, {"A": "random", "B": "random"})
     first = "B" if rec.turn_order.endswith("A") else "A"
     console.say()
@@ -192,7 +205,7 @@ def cmd_replay(args: argparse.Namespace, out: IO[str], console: Console, isatty:
         args, console, result.final_state, agents, first, "continuing with random agents"
     )
     saved = _save(args, append_run(rec, more), "continue")
-    _report(args, out, more, {**meta, "schedule": pattern, "continued": True}, saved)
+    _report(args, out, console, more, {**meta, "schedule": pattern, "continued": True}, saved)
     return EXIT_OK
 
 
@@ -214,7 +227,7 @@ def cmd_recordings(args: argparse.Namespace, out: IO[str]) -> int:
     for path in files:
         try:
             rec = load(path)
-        except RecordingFormatError as e:
+        except (OSError, RecordingFormatError) as e:
             out.write(f"{path.name}  (invalid: {e})\n")
             continue
         result = replay(rec)
@@ -253,11 +266,11 @@ def main(
         if args.command == "play":
             return cmd_game(args, out, console, {"A": args.a, "B": args.b})
         return cmd_recordings(args, out)
-    except ValueError as e:  # bad --schedule / --first combinations
-        out.write(f"error: {e}\n")
+    except ValueError as e:  # bad --schedule, --first or --max-turns
+        console.say(f"error: {e}")
         return EXIT_BAD_ARGS
     except KeyboardInterrupt:  # Ctrl-C outside a human prompt: nothing to save
-        out.write("\ninterrupted\n")
+        console.say("\ninterrupted")
         return EXIT_INTERRUPTED
 
 

@@ -67,6 +67,10 @@ def test_state_is_immutable_and_hashable() -> None:
     s = initial_state(1)
     with pytest.raises(AttributeError):
         s.n = 2  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        s.poles["1a"] = ()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        s.hands["A"] = 9  # type: ignore[index]
     assert hash(s) == hash(initial_state(1))
     assert s == initial_state(1)
     assert s != initial_state(2)
@@ -336,6 +340,17 @@ def test_to_dict_is_plain_json_compatible() -> None:
 # --- invariants under random legal play; line budget: C1 -----------------------------
 
 
+def _has_won(s: State, player: str) -> bool:
+    """The win condition spelled out, so the invariant does not lean on ``winner`` itself."""
+    side = SIDES[player]
+    return (
+        s.hands[player] is None
+        and not s.poles[side[1]]
+        and not s.poles["2"]
+        and bool(s.poles[side[3]])
+    )
+
+
 def _check_invariants(s: State, n: int) -> None:
     disks = sorted(d for pole in s.poles.values() for d in pole)
     disks += sorted(h for h in s.hands.values() if h is not None)
@@ -343,7 +358,8 @@ def _check_invariants(s: State, n: int) -> None:
     for key, pole in s.poles.items():
         assert list(pole) == sorted(pole, reverse=True), f"pole {key} not decreasing"
         assert len(set(pole)) == len(pole)
-    assert sum(1 for p in ("A", "B") if winner(s) == p) <= 1
+    winners = [p for p in ("A", "B") if _has_won(s, p)]
+    assert len(winners) <= 1, f"both players cannot win at once: {s}"
 
 
 @pytest.mark.parametrize("n", [1, 2, 3])

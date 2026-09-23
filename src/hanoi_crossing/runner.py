@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from .engine import PLAYERS, Action, Outcome, State, legal_actions, observe, step, winner
+from .engine import PLAYERS, Action, Outcome, State, check, legal_actions, observe, step, winner
 
 
 class StopGame(Exception):
@@ -81,15 +81,19 @@ def run(
     schedule: Sequence[str],
     agents: Mapping[str, Any],
     repetition_limit: int | None = None,
-    on_turn: Callable[[Turn, State], None] | None = None,
+    on_turn: Callable[[Turn], None] | None = None,
 ) -> RunResult:
     """Play ``schedule`` from ``state`` until a win, a stalemate, or the last entry.
 
     The status is checked before each entry, so an opponent's winning move ends the
     game with the rest counted unplayed. ``repetition_limit`` ends a repeated
     (state, player-to-move) pair as a stalemate. ``on_turn`` lets a frontend print
-    each turn without owning the loop.
+    each turn as it happens without owning the loop.
     """
+    check(
+        not repetition_limit or repetition_limit >= 2,
+        f"repetition_limit must be 2 or more, or 0 to switch it off, got {repetition_limit!r}",
+    )
     turns: list[Turn] = []
     seen: Counter[tuple[State, str]] = Counter()
     for i, player in enumerate(schedule):
@@ -107,6 +111,6 @@ def run(
             return RunResult(state, tuple(turns), "unfinished", None, unplayed)
         turns.append(turn)
         if on_turn is not None:
-            on_turn(turn, state)
+            on_turn(turn)
     won = winner(state)
     return RunResult(state, tuple(turns), "won" if won else "unfinished", won, 0)

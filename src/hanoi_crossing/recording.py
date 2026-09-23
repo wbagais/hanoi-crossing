@@ -87,7 +87,11 @@ def dumps(rec: Recording) -> str:
 
 
 def load(path: str | Path) -> Recording:
-    return loads(Path(path).read_text(encoding="utf-8"))
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        raise RecordingFormatError(f"not UTF-8 text: {e}") from None
+    return loads(text)
 
 
 def dump(rec: Recording, path: str | Path) -> None:
