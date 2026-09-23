@@ -3,6 +3,7 @@
 import io
 import json
 import pathlib
+import re
 
 import pytest
 
@@ -30,19 +31,39 @@ def _cwd(tmp_path, monkeypatch) -> None:  # noqa: ANN001
 
 def test_replay_spec_example_prints_a_wins() -> None:
     code, out = run_cli("replay", SPEC)
-    assert code == 0
-    assert (
-        "status won · winner A · played 3 · illegal 0 · skipped 0 · timeouts 0 · unplayed 0" in out
-    )
+    assert code == 0 and "status won · winner A" in out
     assert "=1=" in out and "A side" in out and "B side" in out
+    assert _trace_lines(out) == [], "the whole game only appears with --trace"
 
 
 def test_replay_json_matches_engine_dict() -> None:
     code, out = run_cli("replay", SPEC, "--json")
     data = json.loads(out)
     assert code == 0 and data["status"] == "won" and data["winner"] == "A"
+    assert set(data) == {
+        "n",
+        "seed",
+        "schedule",
+        "file",
+        "status",
+        "winner",
+        "state",
+        "counts",
+        "turns",
+        "saved",
+    }
+    assert (data["n"], data["seed"], data["schedule"], data["file"]) == (1, 0, "ABA", SPEC)
     assert data["state"] == to_dict(replay(load(SPEC)).final_state)
+    assert data["counts"] == {"played": 3, "illegal": 0, "skipped": 0, "timeouts": 0, "unplayed": 0}
     assert [t["source"] for t in data["turns"]] == ["scripted"] * 3
+    assert data["turns"][0] == {
+        "index": 1,
+        "player": "A",
+        "action": "lift 1",
+        "legal": True,
+        "reason": None,
+        "source": "scripted",
+    }
 
 
 def test_replay_list_style_uses_cross_layout() -> None:
@@ -66,8 +87,28 @@ def test_replay_continue_flag_finishes_with_random_agents(tmp_path) -> None:  # 
     code, out = run_cli(
         "replay", _truncated(tmp_path), "--continue", "--seed", "0", "--max-turns", "500"
     )
-    assert code == 0 and "continuing" in out.lower()
-    assert "status won" in out.split("continuing", 1)[1].lower() or "status" in out
+    assert code == 0 and "continuing with random agents" in out
+    assert "status won · winner B" in out.split("continuing", 1)[1]
+
+
+def test_replay_continue_json_reports_the_continuation_and_saves_the_whole_game(
+    tmp_path,  # noqa: ANN001
+) -> None:
+    _, out = run_cli(
+        "replay", _truncated(tmp_path), "--continue", "--seed", "0", "--max-turns", "500", "--json"
+    )
+    data = json.loads(out)
+    assert data["continued"] is True and data["status"] == "won" and data["winner"] == "B"
+    saved = pathlib.Path(data["saved"])
+    assert saved.exists() and "continue" in saved.name
+    whole = load(saved)
+    assert whole.moves[:2] == load(_truncated(tmp_path)).moves  # the recorded part is kept
+    assert to_dict(replay(whole).final_state) == data["state"]
+
+
+def test_replay_no_continue_never_asks_even_on_a_tty(tmp_path) -> None:  # noqa: ANN001
+    code, out = run_cli("replay", _truncated(tmp_path), "--no-continue", stdin="y\n", isatty=True)
+    assert code == 0 and "Let random players" not in out and "continuing" not in out
 
 
 def test_replay_prompts_on_tty_and_respects_answer(tmp_path) -> None:  # noqa: ANN001
@@ -76,7 +117,8 @@ def test_replay_prompts_on_tty_and_respects_answer(tmp_path) -> None:  # noqa: A
     _, out_no = run_cli("replay", _truncated(tmp_path), stdin="n\n", isatty=True)
     assert "continuing" not in out_no.lower()
     _, out_json = run_cli("replay", _truncated(tmp_path), "--json", stdin="y\n", isatty=True)
-    assert "Let random players" not in out_json
+    data = json.loads(out_json)
+    assert data["status"] == "unfinished" and "continued" not in data
 
 
 def test_replay_bad_file_exits_1(tmp_path) -> None:  # noqa: ANN001
@@ -96,12 +138,34 @@ def test_random_is_reproducible_with_seed() -> None:
     assert a == b and a[0] == 0 and "seed=1" in a[1]
 
 
-def test_random_autosaves_and_replays_to_same_state(tmp_path) -> None:  # noqa: ANN001
+def test_random_autosaves_and_replays_to_same_state() -> None:
     code, out = run_cli("random", "--n", "1", "--seed", "0", "--json")
     data = json.loads(out)
     saved = pathlib.Path(data["saved"])
     assert code == 0 and saved.exists() and saved.parent.name == "recordings"
+    assert re.fullmatch(r"\d{8}-\d{6}-random-n1-seed0(-\d+)?\.json", saved.name), saved.name
     assert to_dict(replay(load(saved)).final_state) == data["state"]
+
+
+def test_play_mode_names_its_own_recordings() -> None:
+    _, out = run_cli(
+        "play",
+        "--a",
+        "random",
+        "--b",
+        "human",
+        "--n",
+        "1",
+        "--seed",
+        "0",
+        "--json",
+        "--move-timeout",
+        "0",
+        "--max-turns",
+        "4",
+    )
+    saved = pathlib.Path(json.loads(out)["saved"])
+    assert re.fullmatch(r"\d{8}-\d{6}-play-n1-seed0(-\d+)?\.json", saved.name), saved.name
 
 
 def test_random_save_names_the_file_and_no_save_writes_nothing(tmp_path) -> None:  # noqa: ANN001
@@ -135,10 +199,22 @@ def test_schedule_and_first_flags_drive_turn_order() -> None:
     assert code == 2
 
 
+def test_ctrl_c_outside_a_prompt_exits_130(monkeypatch) -> None:  # noqa: ANN001
+    def interrupt(*_args: object) -> int:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "cmd_recordings", interrupt)
+    code, out = run_cli("recordings")
+    assert code == 130 and "interrupted" in out
+
+
 def test_bad_arguments_exit_2() -> None:
     assert run_cli("random")[0] == 2
     assert run_cli("play", "--a", "human", "--n", "1")[0] == 2
     assert run_cli("nonsense")[0] == 2
+    code, out = run_cli("random", "--n", "1", "--no-save", "--max-turns", "0")
+    assert code == 2 and "--max-turns must be 1 or more" in out
+    assert run_cli("random", "--n", "1", "--no-save", "--repetition-limit", "1")[0] == 2
 
 
 # --- play -----------------------------------------------------------------------
@@ -167,7 +243,7 @@ def test_play_human_vs_random_with_scripted_stdin() -> None:
     assert "Turn 1, player A" in out and "legal: lift 1, skip" in out and "A>" in out
     assert "illegal: pole 2 is empty. Turn wasted." in out
     assert "not a move" in out.lower() or "try again" in out.lower()
-    assert "ok, holding 1" in out
+    assert "  took disk 1 from pole 1" in out
     assert "status " in out
 
 
@@ -217,12 +293,24 @@ def test_play_human_vs_human_shows_both_prompts() -> None:
 # --- recordings ------------------------------------------------------------------
 
 
-def test_recordings_lists_saved_games(tmp_path) -> None:  # noqa: ANN001
+def test_recordings_lists_saved_games() -> None:
     code, out = run_cli("recordings")
     assert code == 0 and "no recordings" in out
     run_cli("random", "--n", "1", "--seed", "3")
     code, out = run_cli("recordings")
-    assert code == 0 and "n=1" in out and "seed=3" in out and ".json" in out
+    line = next(li for li in out.splitlines() if li.endswith(".json") or ".json" in li)
+    assert code == 0 and "n=1" in line and "seed=3" in line
+    assert "status=won" in line and "winner=" in line and "turns=" in line
+
+
+def test_recordings_reads_another_folder_and_survives_a_bad_file(tmp_path) -> None:  # noqa: ANN001
+    folder = tmp_path / "elsewhere"
+    folder.mkdir()
+    (folder / "broken.json").write_text("not json")
+    run_cli("random", "--n", "1", "--seed", "5", "--save", str(folder / "good.json"))
+    code, out = run_cli("recordings", "--dir", str(folder))
+    assert code == 0
+    assert "broken.json  (invalid:" in out and "good.json" in out
 
 
 # --- full game shown by default -------------------------------------------------------
@@ -230,11 +318,6 @@ def test_recordings_lists_saved_games(tmp_path) -> None:  # noqa: ANN001
 
 def _trace_lines(out: str) -> list[str]:
     return [line for line in out.splitlines() if line[:1].isdigit() and " → " in line]
-
-
-def test_default_output_is_final_state_only() -> None:
-    _, out = run_cli("replay", SPEC)
-    assert _trace_lines(out) == [] and "status won" in out and "A side" in out
 
 
 def test_trace_flag_shows_the_full_game() -> None:
@@ -312,7 +395,7 @@ def test_random_game_with_explicit_repetition_limit_can_stalemate() -> None:
     _, out = run_cli(
         "random", "--n", "1", "--seed", "0", "--no-save", "--json", "--repetition-limit", "2"
     )
-    assert json.loads(out)["status"] in ("stalemate", "won")
+    assert json.loads(out)["status"] == "stalemate"
     _, out = run_cli("random", "--n", "1", "--seed", "0", "--no-save", "--json")
     assert json.loads(out)["status"] == "won"
 

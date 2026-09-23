@@ -2,11 +2,12 @@
 
 from hanoi_crossing.engine import Action, Outcome, State, initial_state, observe
 from hanoi_crossing.render import (
-    describe_outcome,
+    describe_turn,
     render_board,
     render_summary,
     render_trace,
     render_view,
+    result_dict,
 )
 from hanoi_crossing.runner import RunResult, Turn
 
@@ -39,7 +40,7 @@ def test_tower_view_column_width_scales_with_n() -> None:
         text = render_view(observe(s, "B"), player="B", index=1, n=n, legal=[])
         base = next(line for line in text.splitlines() if set(line.strip()) == {"-", " "})
         width = len(base.split()[0])
-        assert width >= 4 * n + 1 and width % 2 == 1
+        assert width == {1: 7, 2: 9, 3: 13}[n], "column width is fixed per n"
         biggest = "=" * (2 * n) + str(2 * n) + "=" * (2 * n)
         assert biggest in text
 
@@ -54,7 +55,7 @@ def test_tower_view_shows_countdown_when_given() -> None:
 
 def test_list_view_uses_bracket_lists() -> None:
     s = _state(2, {"1a": (3,), "2": (1,)}, {"A": 4, "B": None})
-    text = render_view(observe(s, "A"), "A", 4, 2, [Action("place", 3)], style="list")
+    text = render_view(observe(s, "A"), "A", 4, 2, [Action("place", 3)], as_list=True)
     assert text.splitlines()[0].endswith("hand: 4")
     assert "pole 1: [3]   pole 2: [1]   pole 3: []" in text
     assert "legal: place 3" in text
@@ -71,9 +72,22 @@ def test_board_tower_style_shows_both_sides() -> None:
     assert "=1=" in text
 
 
+def test_board_list_style_aligns_when_a_pole_holds_disk_2() -> None:
+    lines = render_board(initial_state(1), as_list=True).splitlines()
+    column = lines[2].index("[2]:")
+    assert lines[0].index("1a:") == column and lines[4].index("3a:") == column
+
+
+def test_tower_rows_stay_aligned_with_two_digit_disks() -> None:
+    text = render_board(initial_state(5))
+    rows = [line for line in text.splitlines() if "=" in line]
+    assert "==========10==========" in text
+    assert len({len(r) for r in rows}) == 1, "every disk row must be the same width"
+
+
 def test_board_list_style_uses_spec_cross_layout() -> None:
     s = _state(2, {"1a": (3, 1), "1b": (4,), "3b": (2,)})
-    text = render_board(s, style="list")
+    text = render_board(s, as_list=True)
     lines = [line.rstrip() for line in text.splitlines()]
     assert lines[0].strip() == "1a: [3, 1]"
     assert lines[1].strip() == "|"
@@ -86,38 +100,41 @@ def test_board_list_style_uses_spec_cross_layout() -> None:
 # --- outcome text, trace, summary ----------------------------------------------------
 
 
-def test_describe_outcome() -> None:
-    ok = Outcome(True, None, None, False)
-    assert describe_outcome(Action("lift", 1), ok, held_after=1) == "ok, holding 1"
-    assert describe_outcome(Action("place", 2), ok, held_after=None, disk=1) == (
-        "ok, placed 1 on pole 2"
-    )
-    assert describe_outcome(Action("skip"), ok) == "skip"
-    bad = Outcome(False, "disk 2 cannot go on disk 1", None, False)
-    assert describe_outcome(Action("place", 2), bad) == (
-        "illegal: disk 2 cannot go on disk 1. Turn wasted."
-    )
+def _result(
+    turns: list[Turn], status: str = "won", winner: str | None = "A", unplayed: int = 0
+) -> RunResult:
+    return RunResult(initial_state(1), tuple(turns), status, winner, unplayed)  # type: ignore[arg-type]
 
 
-def _result(turns: list[Turn], status: str = "won", winner: str | None = "A") -> RunResult:
-    return RunResult(initial_state(1), tuple(turns), status, winner, 0)  # type: ignore[arg-type]
-
-
-def _turn(i: int, p: str, a: Action, legal: bool = True, source: str = "random") -> Turn:
-    out = Outcome(legal, None if legal else "hand is empty", None, False)
+def _turn(
+    i: int, p: str, a: Action, legal: bool = True, source: str = "random", disk: int | None = 1
+) -> Turn:
+    out = Outcome(None if legal else "hand is empty", None, disk if legal else None)
     return Turn(i, p, a, out, source)  # type: ignore[arg-type]
+
+
+def test_describe_turn_says_what_moved_and_where() -> None:
+    assert describe_turn(_turn(1, "A", Action("lift", 1))) == "took disk 1 from pole 1"
+    assert describe_turn(_turn(1, "B", Action("lift", 2))) == "took disk 1 from the shared pole"
+    assert describe_turn(_turn(1, "A", Action("place", 2), disk=3)) == (
+        "put disk 3 on the shared pole"
+    )
+    assert describe_turn(_turn(1, "A", Action("skip"), disk=None)) == "skip"
+    assert describe_turn(_turn(1, "A", Action("place", 3), legal=False)) == (
+        "illegal: hand is empty. Turn wasted."
+    )
 
 
 def test_trace_marks_sources_only_when_relevant() -> None:
     same = [_turn(1, "A", Action("lift", 1)), _turn(2, "B", Action("skip"))]
-    text = render_trace(same, n=1)
+    text = render_trace(same)
     assert "[random]" not in text
-    assert text.splitlines()[0].startswith("1 A lift 1")
+    assert text.splitlines() == ["1 A lift 1 → took disk 1 from pole 1", "2 B skip"]
     mixed = [_turn(1, "A", Action("lift", 1), source="human"), _turn(2, "B", Action("skip"))]
-    text = render_trace(mixed, n=1)
+    text = render_trace(mixed)
     assert "[human]" in text.splitlines()[0] and "[random]" in text.splitlines()[1]
     timed = [_turn(1, "A", Action("lift", 1), source="timeout")]
-    assert "[timeout]" in render_trace(timed, n=1)
+    assert "[timeout]" in render_trace(timed)
 
 
 def test_summary_counts() -> None:
@@ -127,10 +144,41 @@ def test_summary_counts() -> None:
         _turn(3, "A", Action("skip")),
         _turn(4, "B", Action("lift", 1), source="timeout"),
     ]
-    text = render_summary(_result(turns))
+    text = render_summary(_result(turns, unplayed=7))
     assert text == (
-        "status won · winner A · played 4 · illegal 1 · skipped 1 · timeouts 1 · unplayed 0"
+        "status won · winner A · played 4 · illegal 1 · skipped 1 · timeouts 1 · unplayed 7"
     )
     assert render_summary(_result([], "unfinished", None)).startswith(
         "status unfinished · winner -"
     )
+
+
+def test_result_dict_is_plain_json_data() -> None:
+    turns = [_turn(1, "A", Action("lift", 1)), _turn(2, "B", Action("place", 1), legal=False)]
+    data = result_dict(_result(turns, unplayed=3))
+    assert data["status"] == "won" and data["winner"] == "A"
+    assert data["counts"] == {
+        "played": 2,
+        "illegal": 1,
+        "skipped": 0,
+        "timeouts": 0,
+        "unplayed": 3,
+    }
+    assert data["turns"] == [
+        {
+            "index": 1,
+            "player": "A",
+            "action": "lift 1",
+            "legal": True,
+            "reason": None,
+            "source": "random",
+        },
+        {
+            "index": 2,
+            "player": "B",
+            "action": "place 1",
+            "legal": False,
+            "reason": "hand is empty",
+            "source": "random",
+        },
+    ]

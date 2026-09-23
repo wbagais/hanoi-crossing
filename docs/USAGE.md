@@ -15,12 +15,14 @@ uv run hanoi recordings [--dir DIR]
 
 | Flag | Required | Default | What it does |
 |---|---|---|---|
-| `--json` | optional | off | Print one JSON object instead of text: `n`, `seed`, `schedule`, `status`, `winner`, `state` (the engine's `to_dict`), `counts`, `turns` (index, player, action, legal, reason, source), `saved`. Also disables every prompt. |
+| `--json` | optional | off | Print one JSON object instead of text: `n`, `seed`, `schedule`, `status`, `winner`, `state` (the engine's `to_dict`), `counts`, `turns` (index, player, action, legal, reason, source), `saved`, plus `file` and `continued` when replaying. Everything else, including a human's prompts and any error message, goes to stderr, so stdout stays one object. Replay never asks whether to continue. |
 | `--list` | optional | off | Show poles as bracket lists in the spec's cross layout instead of drawn towers. |
 | `--trace` | optional | off | Print the full game before the final board: one line per turn, `index player action → result [source]`. |
 | `--seed S` | optional | `0` | Seeds the random players (and the random fallback for humans). Same seed, same game. Pass any other integer for a different game. |
 | `--max-turns N` | optional | `200 · 3ⁿ` | Schedule length; reaching it ends the game as `unfinished`. The default follows measured random play: 600, 1 800, 5 400, 16 200, 48 600 for N = 1..5. For `replay` it is the length of the continuation. |
 | `--repetition-limit K` | optional | off (`0`) | End as `stalemate` when the same position with the same player to move has occurred K times. Off by default because random players revisit positions by chance, not by choice. For `replay` it applies to the continuation. |
+| `--save FILE` | optional | autosave | Write the recording to `FILE` instead of the autosave name. For `replay` it names the continued game. |
+| `--no-save` | optional | off | Do not write a recording. |
 
 `recordings` takes none of the game flags.
 
@@ -52,9 +54,6 @@ command so the spec's mode is visible by name.
 | `--n N` | required | — | Disks per player. A gets sizes 1, 3, …, 2N−1; B gets 2, 4, …, 2N. |
 | `--first A\|B` | optional | `A` | Who takes turn 1. Rotates the schedule pattern to that player's first occurrence: `AB` → `BA`, `AAB` → `BAA`. Error (exit 2) if the pattern has no such player. |
 | `--schedule P` | optional | `AB` | Turn-order pattern, letters A and B only, repeated to fill `--max-turns`. `AAB` gives A two turns then B one; `A` lets A play alone. Printed before turn 1. |
-| `--no-skip` | optional | off | Random players never choose skip unless it is the only legal action. |
-| `--save FILE` | optional | autosave | Write the recording to `FILE` instead of the autosave name. |
-| `--no-save` | optional | off | Do not write a recording. |
 
 Autosave: every finished game, whatever its status, is written once at the end to
 `recordings/<date>-<time>-<mode>-n<N>-seed<S>.json`, and the path is printed. The
@@ -105,7 +104,8 @@ winner, modification time. Status comes from replaying the file. Prints
 |---|---|
 | 0 | Normal, whatever the game's status. |
 | 1 | The recording file is missing or invalid; the message names the problem. |
-| 2 | Bad arguments, including `--first` naming a player absent from `--schedule`. |
+| 2 | Bad arguments, including `--first` naming a player absent from `--schedule`, or `--max-turns` below 1. |
+| 130 | Interrupted with Ctrl-C outside a player's prompt. |
 
 ## Game end statuses
 

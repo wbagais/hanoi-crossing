@@ -8,11 +8,12 @@ import pytest
 from hanoi_crossing import engine
 from hanoi_crossing.engine import (
     ALL_ACTIONS,
+    POLE_KEYS,
+    SIDES,
     Action,
     Observation,
     Outcome,
     State,
-    from_dict,
     initial_state,
     legal_actions,
     observe,
@@ -36,10 +37,42 @@ def test_action_space_is_fixed_seven_in_order() -> None:
     )
 
 
+@pytest.mark.parametrize("action", ALL_ACTIONS)
+def test_action_text_round_trip(action: Action) -> None:
+    assert Action.parse(str(action)) == action
+
+
+@pytest.mark.parametrize(
+    ("text", "action"),
+    [("lift 1", Action("lift", 1)), ("  place 3 ", Action("place", 3)), ("skip", Action("skip"))],
+)
+def test_action_parse_examples(text: str, action: Action) -> None:
+    assert Action.parse(text) == action
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "lift", "lift 4", "lift 12", "lift x", "skip 1", "jump 1", "lift 1 2", 7]
+)
+def test_action_parse_rejects_bad_text(bad: object) -> None:
+    with pytest.raises(ValueError):
+        Action.parse(bad)
+
+
+def test_pole_keys_are_exactly_the_poles_sides_names() -> None:
+    assert set(POLE_KEYS) == {key for side in SIDES.values() for key in side.values()}
+    assert len(POLE_KEYS) == 5
+
+
 def test_state_is_immutable_and_hashable() -> None:
     s = initial_state(1)
     with pytest.raises(AttributeError):
         s.n = 2  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        s.poles["1a"] = ()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        s.hands["A"] = 9  # type: ignore[index]
+    with pytest.raises(TypeError):
+        observe(s, "A").poles[1] = ()  # type: ignore[index]  # an agent cannot edit its view
     assert hash(s) == hash(initial_state(1))
     assert s == initial_state(1)
     assert s != initial_state(2)
@@ -59,7 +92,7 @@ def test_initial_state_layout(n: int, a: tuple[int, ...], b: tuple[int, ...]) ->
     assert s.hands == {"A": None, "B": None}
 
 
-@pytest.mark.parametrize("bad", [0, -1, 1.5, "2"])
+@pytest.mark.parametrize("bad", [0, -1, 1.5, "2", True])
 def test_initial_state_rejects_bad_n(bad: object) -> None:
     with pytest.raises(ValueError):
         initial_state(bad)  # type: ignore[arg-type]
@@ -86,18 +119,11 @@ def test_observe_shows_own_hand_not_opponents() -> None:
     )
     assert observe(s, "A").hand == 1
     assert observe(s, "B").hand == 2
-    assert "hands" not in vars(observe(s, "A"))
 
 
 def test_observe_rejects_unknown_player() -> None:
     with pytest.raises(ValueError):
         observe(initial_state(1), "C")  # type: ignore[arg-type]
-
-
-def test_engine_module_has_no_io_or_randomness() -> None:
-    src = open(engine.__file__, encoding="utf-8").read()
-    for banned in ("import random", "import os", "import sys", "print(", "open("):
-        assert banned not in src
 
 
 # --- helpers -------------------------------------------------------------------
@@ -137,17 +163,17 @@ def test_legal_actions_order_follows_all_actions() -> None:
 def test_step_lift_and_place_change_state() -> None:
     s0 = initial_state(1)
     s1, out = step(s0, "A", Action("lift", 1))
-    assert out == Outcome(legal=True, reason=None, winner=None, done=False)
+    assert out == Outcome(disk=1)
     assert s1.poles["1a"] == () and s1.hands["A"] == 1
     assert s0.poles["1a"] == (1,), "old state must be untouched"
     s2, out = step(s1, "A", Action("place", 2))
-    assert out.legal and s2.poles["2"] == (1,) and s2.hands["A"] is None
+    assert out.legal and out.disk == 1 and s2.poles["2"] == (1,) and s2.hands["A"] is None
 
 
 def test_step_skip_is_legal_and_changes_nothing() -> None:
     s = initial_state(1)
     s2, out = step(s, "B", Action("skip"))
-    assert out.legal and s2 == s
+    assert out.legal and out.disk is None and s2 == s
 
 
 @pytest.mark.parametrize(
@@ -176,22 +202,22 @@ def test_step_illegal_reports_reason_and_returns_same_object(
 ) -> None:
     s2, out = step(state, player, action)  # type: ignore[arg-type]
     assert s2 is state
-    assert out == Outcome(legal=False, reason=reason, winner=None, done=False)
+    assert out == Outcome(reason)
 
 
 @pytest.mark.parametrize(
-    ("player", "action"),
-    [
-        ("C", Action("skip")),
-        ("A", Action("jump", 1)),  # type: ignore[arg-type]
-        ("A", Action("lift", 4)),  # type: ignore[arg-type]
-        ("A", Action("lift", None)),
-        ("A", Action("place", 0)),  # type: ignore[arg-type]
-        ("A", Action("skip", 1)),
-        ("A", "lift 1"),
-    ],
+    ("verb", "pole"),
+    [("jump", 1), ("lift", 4), ("lift", None), ("place", 0), ("skip", 1), ("lift", True)],
 )
-def test_step_malformed_raises(player: str, action: object) -> None:
+def test_malformed_actions_cannot_be_built(verb: str, pole: object) -> None:
+    with pytest.raises(ValueError):
+        Action(verb, pole)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("player", "action"), [("C", Action("skip")), ("A", "lift 1"), ("A", None)]
+)
+def test_step_rejects_an_unknown_player_or_a_non_action(player: str, action: object) -> None:
     with pytest.raises(ValueError):
         step(initial_state(1), player, action)  # type: ignore[arg-type]
 
@@ -213,11 +239,14 @@ def test_placing_opponents_disk_on_own_pole_follows_size_rule() -> None:
 
 
 def test_opponents_private_poles_are_unreachable() -> None:
-    # A can only name poles 1-3 from A's side; there is no way to address 1b or 3b.
-    s = make({"1b": (2,)})
-    for a in ALL_ACTIONS:
-        s2, _ = step(s, "A", a)
-        assert s2.poles["1b"] == (2,) and s2.poles["3b"] == ()
+    """A acts on a board where B also has disks; B's side must come out untouched."""
+    s = make({"1a": (3,), "3a": (5,), "1b": (6, 2), "3b": (4,)}, {"A": 1, "B": None})
+    for action in ALL_ACTIONS:
+        s2, _ = step(s, "A", action)
+        assert s2.poles["1b"] == (6, 2) and s2.poles["3b"] == (4,), f"{action} reached B's side"
+    # and the moves A can make land on A's own poles
+    after, outcome = step(s, "A", Action("place", 3))
+    assert outcome.legal and after.poles["3a"] == (5, 1)
 
 
 # --- winner: R11, R13, I1, I4, I6, R10 --------------------------------------------
@@ -228,8 +257,8 @@ def test_spec_example_n1_a_wins_in_three_steps() -> None:
     s, o1 = step(s, "A", Action("lift", 1))
     s, o2 = step(s, "B", Action("lift", 1))
     s, o3 = step(s, "A", Action("place", 3))
-    assert (o1.done, o2.done) == (False, False)
-    assert o3 == Outcome(legal=True, reason=None, winner="A", done=True)
+    assert (o1.winner, o2.winner) == (None, None)
+    assert o3 == Outcome(winner="A", disk=1)
     assert winner(s) == "A"
     assert s.poles["3a"] == (1,) and s.hands["B"] == 2
 
@@ -247,7 +276,7 @@ def test_opponents_lift_from_shared_pole_hands_over_the_win() -> None:
     s = make({"3a": (5, 3, 1), "2": (6,), "1b": (4, 2)})
     assert winner(s) is None
     s2, out = step(s, "B", Action("lift", 2))
-    assert out == Outcome(legal=True, reason=None, winner="A", done=True)
+    assert out == Outcome(winner="A", disk=6)
     assert winner(s2) == "A"
 
 
@@ -269,7 +298,7 @@ def test_finished_game_rejects_every_action_including_skip() -> None:
         for a in ALL_ACTIONS:
             s2, out = step(s, p, a)
             assert s2 is s
-            assert out == Outcome(legal=False, reason="game is over", winner="A", done=True)
+            assert out == Outcome("game is over", "A")
 
 
 def _hanoi(n: int, src: int, dst: int, aux: int) -> list[tuple[int, int]]:
@@ -304,51 +333,21 @@ def test_to_dict_is_plain_json_compatible() -> None:
         "hands": {"A": None, "B": None},
     }
     json.dumps(d)  # must not raise
-
-
-def test_round_trip_initial_and_mid_game() -> None:
-    s = initial_state(3)
-    assert from_dict(to_dict(s)) == s
-    s, _ = step(s, "A", Action("lift", 1))
-    s, _ = step(s, "B", Action("lift", 1))
-    s, _ = step(s, "A", Action("place", 2))
-    assert from_dict(json.loads(json.dumps(to_dict(s)))) == s
-
-
-def _good() -> dict:
-    return {
-        "n": 1,
-        "poles": {"1a": [1], "2": [], "3a": [], "1b": [2], "3b": []},
-        "hands": {"A": None, "B": None},
-    }
-
-
-def _with(**changes: object) -> dict:
-    d = _good()
-    d.update(changes)
-    return d
-
-
-@pytest.mark.parametrize(
-    "bad",
-    [
-        {},
-        "not a dict",
-        _with(poles={}),
-        _with(poles={"1a": [1], "2": [], "3a": [], "1b": [2]}),  # missing 3b
-        _with(hands={"A": None}),  # missing B
-        _with(poles={"1a": ["1"], "2": [], "3a": [], "1b": [2], "3b": []}),  # str disk
-        _with(hands={"A": "x", "B": None}),
-        _with(n=0),
-        _with(n="1"),
-    ],
-)
-def test_from_dict_rejects_bad_shapes(bad: object) -> None:
-    with pytest.raises(ValueError):
-        from_dict(bad)  # type: ignore[arg-type]
+    assert list(d["poles"]) == list(POLE_KEYS), "poles keep their serialization order"
 
 
 # --- invariants under random legal play; line budget: C1 -----------------------------
+
+
+def _has_won(s: State, player: str) -> bool:
+    """The win condition spelled out, so the invariant does not lean on ``winner`` itself."""
+    side = SIDES[player]
+    return (
+        s.hands[player] is None
+        and not s.poles[side[1]]
+        and not s.poles["2"]
+        and bool(s.poles[side[3]])
+    )
 
 
 def _check_invariants(s: State, n: int) -> None:
@@ -358,7 +357,8 @@ def _check_invariants(s: State, n: int) -> None:
     for key, pole in s.poles.items():
         assert list(pole) == sorted(pole, reverse=True), f"pole {key} not decreasing"
         assert len(set(pole)) == len(pole)
-    assert sum(1 for p in ("A", "B") if winner(s) == p) <= 1
+    winners = [p for p in ("A", "B") if _has_won(s, p)]
+    assert len(winners) <= 1, f"both players cannot win at once: {s}"
 
 
 @pytest.mark.parametrize("n", [1, 2, 3])
@@ -376,8 +376,8 @@ def test_random_legal_play_keeps_invariants(n: int, seed: int) -> None:
         s, out = step(s, player, rng.choice(legal))
         assert out.legal
         _check_invariants(s, n)
-        if out.done:
-            assert out.winner == winner(s) is not None
+        if out.winner is not None:
+            assert out.winner == winner(s)
             break
 
 

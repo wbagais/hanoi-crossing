@@ -1,28 +1,25 @@
-"""The JSON recording format (T2, T9). A format, not a runner.
+"""The JSON recording format and the files that hold it (T2, T9)::
 
-.. code-block:: json
-
-    {"n": 2, "turn_order": "AABBAABAA",
-     "moves": ["lift 1", "place 2", "skip"],
+    {"n": 2, "turn_order": "AABBAABAA", "moves": ["lift 1", "place 2", "skip"],
      "sources": ["human", "human", "timeout"]}
 
-``turn_order`` is kept separate from ``moves`` because the spec calls the turn
-order external. ``sources`` is optional and informational: a replay reproduces
-the moves exactly and keeps the original sources for display. A replay always
-restarts from the initial position; the file holds moves, never board states.
+``turn_order`` is separate because the spec calls the turn order external;
+``sources`` is optional and informational. A replay restarts from the initial
+position, so the file holds moves, never board states.
 """
 
-from __future__ import annotations
-
 import json
+import re
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from .agents import ScriptedAgent
-from .engine import PLAYERS, Action, Player, initial_state
-from .runner import RunResult, from_string, run
+from .engine import PLAYERS, Action, check, initial_state, is_positive_int
+from .runner import RunResult, parse_schedule, run
 
 SOURCES = ("human", "random", "scripted", "timeout")
+KEYS = {"n", "turn_order", "moves", "sources"}
 
 
 class RecordingFormatError(ValueError):
@@ -31,102 +28,93 @@ class RecordingFormatError(ValueError):
 
 @dataclass(frozen=True)
 class Recording:
+    """A whole game as moves. Validated on construction, however it was built."""
+
     n: int
     turn_order: str
-    moves: tuple[str, ...]
+    moves: tuple[Action, ...]
     sources: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "moves", tuple(self.moves))
         if self.sources is not None:
             object.__setattr__(self, "sources", tuple(self.sources))
-        _validate(self)
-
-
-def parse_action(text: str) -> Action:
-    """``"lift 1"`` / ``"place 3"`` / ``"skip"`` -> Action."""
-    if not isinstance(text, str):
-        raise RecordingFormatError(f"move must be a string, got {text!r}")
-    parts = text.split()
-    if parts == ["skip"]:
-        return Action("skip")
-    if len(parts) == 2 and parts[0] in ("lift", "place") and parts[1] in ("1", "2", "3"):
-        return Action(parts[0], int(parts[1]))  # type: ignore[arg-type]
-    raise RecordingFormatError(
-        f"bad move {text!r}; expected 'lift N', 'place N' (N=1..3) or 'skip'"
-    )
-
-
-def format_action(action: Action) -> str:
-    return action.verb if action.verb == "skip" else f"{action.verb} {action.pole}"
-
-
-def _validate(rec: Recording) -> None:
-    if not isinstance(rec.n, int) or isinstance(rec.n, bool) or rec.n < 1:
-        raise RecordingFormatError(f"n must be a positive integer, got {rec.n!r}")
-    if not isinstance(rec.turn_order, str):
-        raise RecordingFormatError("turn_order must be a string of A and B")
-    try:
-        from_string(rec.turn_order)
-    except ValueError as e:
-        raise RecordingFormatError(str(e)) from None
-    if len(rec.turn_order) != len(rec.moves):
-        raise RecordingFormatError(
-            f"turn_order has {len(rec.turn_order)} entries but moves has {len(rec.moves)}"
+        invalid = RecordingFormatError
+        check(is_positive_int(self.n), f"n must be a positive integer, got {self.n!r}", invalid)
+        check(isinstance(self.turn_order, str), "turn_order must be a string of A and B", invalid)
+        try:
+            parse_schedule(self.turn_order)
+        except ValueError as e:
+            raise invalid(str(e)) from None
+        check(
+            len(self.turn_order) == len(self.moves),
+            f"turn_order has {len(self.turn_order)} entries, moves has {len(self.moves)}",
+            invalid,
         )
-    for move in rec.moves:
-        parse_action(move)
-    if rec.sources is not None:
-        if len(rec.sources) != len(rec.moves):
-            raise RecordingFormatError("sources must have one entry per move")
-        bad = sorted(set(rec.sources) - set(SOURCES))
-        if bad:
-            raise RecordingFormatError(f"unknown sources {bad}; expected {SOURCES}")
+        check(all(isinstance(m, Action) for m in self.moves), "moves must be Actions", invalid)
+        if self.sources is not None:
+            check(len(self.sources) == len(self.moves), "sources need one entry per move", invalid)
+            check(all(isinstance(s, str) for s in self.sources), "sources must be strings", invalid)
+            unknown = sorted(set(self.sources) - set(SOURCES))
+            check(not unknown, f"unknown sources {unknown}; expected {SOURCES}", invalid)
+
+
+# --- text and files ------------------------------------------------------------------
 
 
 def loads(text: str) -> Recording:
+    invalid = RecordingFormatError
     try:
         data = json.loads(text)
     except json.JSONDecodeError as e:
-        raise RecordingFormatError(f"not valid JSON: {e}") from None
-    if not isinstance(data, dict):
-        raise RecordingFormatError("recording must be a JSON object")
-    allowed = {"n", "turn_order", "moves", "sources"}
-    if not {"n", "turn_order", "moves"} <= set(data) or not set(data) <= allowed:
-        raise RecordingFormatError(
-            f"recording keys must be n, turn_order, moves[, sources]; got {sorted(data)}"
-        )
-    if not isinstance(data["moves"], list):
-        raise RecordingFormatError("moves must be a list")
-    sources = data.get("sources")
-    if sources is not None and not isinstance(sources, list):
-        raise RecordingFormatError("sources must be a list")
-    return Recording(
-        data["n"], data["turn_order"], tuple(data["moves"]), sources and tuple(sources)
-    )
+        raise invalid(f"not valid JSON: {e}") from None
+    shape = isinstance(data, dict) and {"n", "turn_order", "moves"} <= set(data) <= KEYS
+    check(shape, "recording must be an object: n, turn_order, moves[, sources]", invalid)
+    moves, sources = data["moves"], data.get("sources")
+    check(isinstance(moves, list) and isinstance(sources, list | None), "expected lists", invalid)
+    try:
+        actions = tuple(Action.parse(m) for m in moves)
+    except ValueError as e:
+        raise invalid(str(e)) from None
+    return Recording(data["n"], data["turn_order"], actions, sources)
 
 
 def dumps(rec: Recording) -> str:
-    data: dict = {"n": rec.n, "turn_order": rec.turn_order, "moves": list(rec.moves)}
+    data: dict = {"n": rec.n, "turn_order": rec.turn_order, "moves": [str(m) for m in rec.moves]}
     if rec.sources is not None:
         data["sources"] = list(rec.sources)
     return json.dumps(data, indent=2) + "\n"
 
 
 def load(path: str | Path) -> Recording:
-    return loads(Path(path).read_text(encoding="utf-8"))
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        raise RecordingFormatError(f"not UTF-8 text: {e}") from None
+    return loads(text)
 
 
 def dump(rec: Recording, path: str | Path) -> None:
     Path(path).write_text(dumps(rec), encoding="utf-8")
 
 
-def to_agents(rec: Recording) -> dict[Player, ScriptedAgent]:
-    """Split the moves into one scripted agent per player, in turn order."""
-    per_player: dict[Player, list[Action]] = {p: [] for p in PLAYERS}
-    for player, move in zip(rec.turn_order, rec.moves, strict=True):
-        per_player[player].append(parse_action(move))  # type: ignore[index]
-    return {p: ScriptedAgent(moves) for p, moves in per_player.items()}
+def autosave_path(folder: Path, mode: str, n: int, seed: int) -> Path:
+    """A fresh file name such as ``20260921-221500-random-n2-seed0.json``; creates the folder."""
+    folder.mkdir(parents=True, exist_ok=True)
+    stem = f"{datetime.now():%Y%m%d-%H%M%S}-{mode}-n{n}-seed{seed}"
+    path, k = folder / f"{stem}.json", 1
+    while path.exists():
+        path, k = folder / f"{stem}-{k}.json", k + 1
+    return path
+
+
+def seed_in_name(path: Path) -> str | None:
+    """The seed written into an autosaved file name, if there is one."""
+    match = re.search(r"seed(-?\d+)", path.name)
+    return match.group(1) if match else None
+
+
+# --- games <-> recordings ------------------------------------------------------------
 
 
 def from_run(n: int, result: RunResult) -> Recording:
@@ -134,11 +122,27 @@ def from_run(n: int, result: RunResult) -> Recording:
     return Recording(
         n=n,
         turn_order="".join(t.player for t in result.turns),
-        moves=tuple(format_action(t.action) for t in result.turns),
+        moves=tuple(t.action for t in result.turns),
         sources=tuple(t.source for t in result.turns),
+    )
+
+
+def append_run(rec: Recording, result: RunResult) -> Recording:
+    """``rec`` followed by the turns of ``result``: the whole continued game (D35)."""
+    tail = from_run(rec.n, result)
+    head_sources = rec.sources or ("scripted",) * len(rec.moves)
+    return Recording(
+        rec.n,
+        rec.turn_order + tail.turn_order,
+        rec.moves + tail.moves,
+        head_sources + tail.sources,
     )
 
 
 def replay(rec: Recording) -> RunResult:
     """Re-play a recording from the initial position through the one runner."""
-    return run(initial_state(rec.n), from_string(rec.turn_order), to_agents(rec))
+    moves_of: dict[str, list[Action]] = {p: [] for p in PLAYERS}
+    for player, move in zip(rec.turn_order, rec.moves, strict=True):
+        moves_of[player].append(move)
+    agents = {p: ScriptedAgent(moves) for p, moves in moves_of.items()}
+    return run(initial_state(rec.n), parse_schedule(rec.turn_order), agents)
