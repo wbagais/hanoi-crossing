@@ -522,10 +522,11 @@ feature was kept; what changed is where each one lives.
 - **Rejected:** `get_args(Literal[...])` (keeps the hints, adds a layer to follow).
 
 ### D54. `Outcome` keeps only what it cannot derive
-- **Choice:** `Outcome` stores `reason`, `winner`, `disk`; `legal` and `done` are
-  properties. `pole_key` is gone: public functions check the player once, internals
-  index `SIDES`.
+- **Choice:** `Outcome` stores `reason`, `winner`, `disk`; `legal` is a property.
+  `done` is gone, and so is `pole_key`: public functions check the player once and
+  the internals index `SIDES`.
 - **Reason:** `legal` restated `reason is None` and `done` restated `winner is not
-  None`, so three fields could contradict two; the player was validated up to seven
-  times per turn.
-- **Rejected:** keeping `done` as a field (the property reads the same).
+  None`, so five fields held three facts and could contradict each other; nothing
+  outside the tests read `done`; the player was validated up to seven times a turn.
+- **Rejected:** keeping `done` for callers who prefer a flag (`outcome.winner is not
+  None` is as short and cannot disagree).

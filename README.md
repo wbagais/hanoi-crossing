@@ -227,7 +227,7 @@ class HanoiEnv:  # sketch, not shipped
         reward = 1 if out.winner == player else -1 if out.winner else -0.01
         if not out.legal:
             reward -= 0.1  # trainer's choice, not ours
-        return encode(observe(self.state, player)), reward, out.done, mask
+        return encode(observe(self.state, player)), reward, out.winner is not None, mask
 ```
 
 The three properties this relies on are already tested: `observe` leaks nothing the
