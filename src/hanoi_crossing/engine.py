@@ -115,10 +115,6 @@ class Outcome:
     def legal(self) -> bool:
         return self.reason is None
 
-    @property
-    def done(self) -> bool:
-        return self.winner is not None
-
 
 def _require_player(player: object) -> str:
     """Every public function checks the player once; the internals then trust it."""

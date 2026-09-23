@@ -256,7 +256,7 @@ def test_spec_example_n1_a_wins_in_three_steps() -> None:
     s, o1 = step(s, "A", Action("lift", 1))
     s, o2 = step(s, "B", Action("lift", 1))
     s, o3 = step(s, "A", Action("place", 3))
-    assert (o1.done, o2.done) == (False, False)
+    assert (o1.winner, o2.winner) == (None, None)
     assert o3 == Outcome(winner="A", disk=1)
     assert winner(s) == "A"
     assert s.poles["3a"] == (1,) and s.hands["B"] == 2
@@ -404,8 +404,8 @@ def test_random_legal_play_keeps_invariants(n: int, seed: int) -> None:
         s, out = step(s, player, rng.choice(legal))
         assert out.legal
         _check_invariants(s, n)
-        if out.done:
-            assert out.winner == winner(s) is not None
+        if out.winner is not None:
+            assert out.winner == winner(s)
             break
 
 
