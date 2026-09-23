@@ -1,14 +1,9 @@
 """Human play at the terminal (an addition beyond the spec, A1/A2).
 
-``Console`` is the terminal side of one game: it reads lines from stdin (with a
-timeout) and prints what happened after each turn. ``HumanAgent`` is a player at
-that console. It implements the same ``choose`` contract as every other agent, so
-the runner cannot tell a person from a program.
-
-When a person does not answer in time (or input ends), the fallback agent moves
-for them and the turn is labelled ``timeout``. The game ends (``StopGame``) on
-``quit``, on Ctrl-C, or after ``max_timeouts`` unanswered prompts in a row, so an
-absent person never leaves the game playing itself for hours.
+``Console`` is the terminal side of one game; ``HumanAgent`` is a person at it,
+implementing the same ``choose`` contract as every other agent. No answer in time
+means the fallback agent moves instead (labelled ``timeout``); ``quit``, Ctrl-C or
+``max_timeouts`` unanswered prompts end the game.
 """
 
 from __future__ import annotations

@@ -1,14 +1,9 @@
-"""The one game loop.
+"""The one game loop: ``play_turn`` for one turn, ``run`` over a schedule.
 
-``play_turn`` plays a single turn for one player with one agent; ``run`` loops it
-over an external schedule. Replay, random play, human play, and continuing an
-unfinished game are all ``run`` with different agents and start states; there is
-no other loop in the codebase.
-
-The runner owns what the engine deliberately does not: the schedule (R10), the
-turn log, and the two non-winning exits of interpretation I5: ``unfinished`` when
-the schedule is exhausted and ``stalemate`` when the same position with the same
-player to move has occurred ``repetition_limit`` times.
+Replay, random play, human play and continuing a game are all ``run`` with
+different agents and start states. The runner owns what the engine does not: the
+schedule (R10), the turn log, and the non-winning exits ``unfinished`` and
+``stalemate`` (I5).
 """
 
 from __future__ import annotations
@@ -25,12 +20,7 @@ Status = Literal["won", "unfinished", "stalemate"]
 
 
 class StopGame(Exception):
-    """Raised from inside an agent to end the game now.
-
-    ``run`` catches it and returns the game so far as ``unfinished``, so a quit,
-    an interrupt, or an abandoned human turn still yields a result that can be
-    rendered, saved, and continued later.
-    """
+    """Raised inside an agent to end the game now; ``run`` returns it as ``unfinished``."""
 
 
 @dataclass(frozen=True)
@@ -98,14 +88,12 @@ def run(
     repetition_limit: int | None = None,
     on_turn: Callable[[Turn, State], None] | None = None,
 ) -> RunResult:
-    """Play ``schedule`` from ``state``. Stops at a win, a stalemate, or the end.
+    """Play ``schedule`` from ``state`` until a win, a stalemate, or the last entry.
 
-    Before each entry the game status is checked: a winner ends the game with
-    the remaining entries counted as unplayed; with ``repetition_limit`` set, a
-    (state, player-to-move) pair seen that many times ends it as a stalemate.
-    ``on_turn`` is called after every played turn with the turn and the new
-    state, so a frontend can print live without owning the loop. An agent may
-    raise ``StopGame`` to end the game early; the result is then ``unfinished``.
+    The status is checked before each entry, so an opponent's winning move ends the
+    game with the rest counted unplayed. ``repetition_limit`` ends a repeated
+    (state, player-to-move) pair as a stalemate. ``on_turn`` lets a frontend print
+    each turn without owning the loop.
     """
     turns: list[Turn] = []
     seen: Counter[tuple[State, Player]] = Counter()

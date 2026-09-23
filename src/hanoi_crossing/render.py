@@ -1,7 +1,7 @@
-"""Text for the terminal: turn view, final board, turn lines, summary, JSON result.
+"""Text for the terminal: turn view, board, turn lines, summary, JSON result.
 
-Pure builders; nothing here prints. Two styles: ``tower`` (default) draws disks
-to scale, ``list`` shows poles as bracket lists in the spec's cross layout.
+Pure builders; nothing here prints. Style ``tower`` draws disks to scale, ``list``
+uses bracket lists in the spec's cross layout.
 """
 
 from __future__ import annotations

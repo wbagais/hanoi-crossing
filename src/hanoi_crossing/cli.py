@@ -1,13 +1,10 @@
 """The ``hanoi`` command: replay, random, play, recordings.
 
-Only argument parsing and wiring live here: every command builds agents, calls the
-one runner, and prints the result through ``render``. Everything is reachable
-through ``main(argv, stdin, stdout, isatty, stderr)`` so tests never spawn a process.
-
-Output goes to two streams: ``out`` carries the result (text or JSON), the console
-carries interaction (headers, views, prompts, per-turn lines). They are the same
-stream except with ``--json``, where interaction moves to stderr so stdout is
-exactly one JSON object.
+Only argument parsing and wiring: each command builds agents, calls the one runner
+and prints through ``render``. All of it is reachable through ``main(argv, stdin,
+stdout, isatty, stderr)``, so tests never spawn a process. ``out`` carries the
+result, the console carries interaction; with ``--json`` the console moves to
+stderr so stdout is exactly one JSON object.
 """
 
 from __future__ import annotations
@@ -43,12 +40,7 @@ RECORDINGS = Path("recordings")
 
 
 def default_max_turns(n: int) -> int:
-    """Schedule length when --max-turns is not given.
-
-    Random games need roughly three times more turns per extra disk (measured
-    medians 10, 44, 136, 474, 1434 for n = 1..5; worst cases about 3x the median).
-    200 * 3**n clears every observed worst case with headroom (D41).
-    """
+    """Schedule length when --max-turns is not given: clears every measured worst case (D41)."""
     return 200 * 3**n
 
 
@@ -56,28 +48,30 @@ def default_max_turns(n: int) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    output = argparse.ArgumentParser(add_help=False)
+    """Four subcommands over four groups of shared flags."""
+    output = argparse.ArgumentParser(add_help=False)  # every command
     output.add_argument("--json", action="store_true", help="machine-readable output; no prompts")
     output.add_argument("--list", action="store_true", help="bracket lists instead of towers")
     output.add_argument("--trace", action="store_true", help="one line per turn before the board")
     output.add_argument("--seed", type=int, default=0, help="seed for random agents (default 0)")
 
-    game = argparse.ArgumentParser(add_help=False)
+    game = argparse.ArgumentParser(add_help=False)  # commands that play or replay a game
     game.add_argument("--schedule", default="AB", help="turn-order pattern, repeated (default AB)")
     game.add_argument("--max-turns", type=int, help="schedule length (default 200 * 3**n)")
-    game.add_argument(
-        "--repetition-limit",
-        type=int,
-        default=0,
-        help="end as stalemate after K repeats of a position; 0 = off (default)",
-    )
+    game.add_argument("--repetition-limit", type=int, default=0, help="stalemate after K repeats")
     game.add_argument("--save", metavar="FILE", help="recording file name (default: autosave)")
     game.add_argument("--no-save", action="store_true", help="do not write a recording")
 
-    fresh = argparse.ArgumentParser(add_help=False)
+    fresh = argparse.ArgumentParser(add_help=False)  # commands starting a new game
     fresh.add_argument("--n", type=int, required=True, help="disks per player")
     fresh.add_argument("--first", choices=("A", "B"), default="A", help="who takes turn 1")
     fresh.add_argument("--no-skip", action="store_true", help="random agents avoid skip")
+
+    human = argparse.ArgumentParser(add_help=False)  # only where a person can play
+    human.add_argument("--a", choices=("random", "human"), required=True, help="A's moves")
+    human.add_argument("--b", choices=("random", "human"), required=True, help="B's moves")
+    human.add_argument("--move-timeout", type=float, default=30, help="seconds per human move")
+    human.add_argument("--max-timeouts", type=int, default=3, help="end after K silent prompts")
 
     parser = argparse.ArgumentParser(prog="hanoi", description="Hanoi Crossing")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -90,18 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("random", parents=[output, game, fresh], help="two random players")
 
-    p_play = sub.add_parser("play", parents=[output, game, fresh], help="any mix of players")
-    p_play.add_argument("--a", choices=("random", "human"), required=True)
-    p_play.add_argument("--b", choices=("random", "human"), required=True)
-    p_play.add_argument(
-        "--move-timeout", type=float, default=30, help="seconds per human move; 0 disables"
-    )
-    p_play.add_argument(
-        "--max-timeouts",
-        type=int,
-        default=3,
-        help="end the game after this many unanswered prompts in a row; 0 = never (default 3)",
-    )
+    sub.add_parser("play", parents=[output, game, fresh, human], help="any mix of players")
 
     p_rec = sub.add_parser("recordings", parents=[output], help="list saved games")
     p_rec.add_argument("--dir", default=str(RECORDINGS))

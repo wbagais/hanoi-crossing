@@ -1,17 +1,8 @@
-"""How a move is chosen.
+"""How a move is chosen: an ``Observation`` and the legal actions in, an ``Action`` out.
 
-An agent receives only what a player may see, an ``Observation`` and the list of
-legal actions, and returns one ``Action``. It never sees the full ``State`` (R3,
-T8). This is exactly the contract an RL policy, an LLM, or a network client would
-implement; the random agent proves the seam.
-
-Two agents live here:
-
-* ``RandomAgent``: uniform pick from the legal list, seeded by the caller.
-* ``ScriptedAgent``: replays recorded moves verbatim, ignoring legality, so a
-  recorded illegal move is reproduced as a wasted turn.
-
-A human at the keyboard is a frontend concern and lives in ``human``.
+An agent never sees the full ``State`` (R3, T8) - this is the contract an RL policy,
+an LLM, or a network client would implement. A person at the keyboard is a frontend
+concern and lives in ``human``.
 """
 
 from __future__ import annotations
@@ -24,11 +15,7 @@ from .engine import Action, Observation
 
 
 class Agent(Protocol):
-    """The external-agent contract.
-
-    ``source`` labels the move just chosen (``random``, ``scripted``, ``human``,
-    ``timeout``, ...); the runner copies it onto the turn.
-    """
+    """``source`` labels the move just chosen; the runner copies it onto the turn."""
 
     source: str
 
@@ -54,7 +41,7 @@ class RandomAgent:
 
 
 class ScriptedAgent:
-    """Replays a fixed sequence of actions, one per call, legal or not."""
+    """Replays recorded actions, legal or not, so a recorded illegal move is wasted again."""
 
     source = "scripted"
 

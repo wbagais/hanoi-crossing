@@ -16,7 +16,7 @@ under [Future work](#future-work) and deliberately not built.
 
 ```bash
 uv sync
-uv run pytest                                  # 209 tests
+uv run pytest                                  # 210 tests
 uv run hanoi replay examples/spec_n1.json      # the spec's N=1 game: A wins
 uv run hanoi random --n 3 --seed 7 --trace     # two random players, every turn shown
 uv run hanoi play --a human --b random --n 2   # you against a random player
@@ -187,7 +187,7 @@ Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
 7. **Ownership is not tracked after setup.** Any player may lift any top disk from
    pole 2 and build with it; the win condition never mentions whose disks they are.
 
-### Engine (`engine.py`, 281 lines)
+### Engine (`engine.py`, 263 lines)
 
 Pure functions over an immutable `State`. No I/O, no randomness, no turn counter,
 no stored "finished" flag: `winner(state)` is recomputed from the board.
@@ -324,14 +324,14 @@ docs/USAGE.md         every command, flag, default, exit code
 plans/PLAN.md         the stage plan, traceability table, status per stage
 examples/             six recordings, each showing one rule; all pinned by tests
 src/hanoi_crossing/
-  engine.py           rules (281 lines, guarded by a test at < 500)
+  engine.py           rules (263 lines, guarded by a test at < 500)
   agents.py           Random / Scripted agents
   runner.py           play_turn, run, schedules
   recording.py        JSON format, recording files, replay
   render.py           towers, lists, turn lines, summary, JSON result
   human.py            terminal play: console, human agent, timeouts
   cli.py              the hanoi command: arguments and wiring only
-tests/                209 tests; the engine is tested directly, the CLI through main();
+tests/                210 tests; the engine is tested directly, the CLI through main();
                       test_architecture.py enforces the import table in CLAUDE.md
 ```
 
@@ -367,7 +367,7 @@ decision log records which.
   reorganised the modules into four rings: human play moved out of the CLI into
   `human.py`, the engine now reports which disk moved, duplicated formatting and
   checks collapsed to one place each, and a test enforces the import rules.
-  D45–D50.
+  D45–D51. The code went from 1 329 to 1 183 lines without losing a feature.
 
 ### Journey
 

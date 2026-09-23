@@ -201,18 +201,18 @@ def test_step_illegal_reports_reason_and_returns_same_object(
 
 
 @pytest.mark.parametrize(
-    ("player", "action"),
-    [
-        ("C", Action("skip")),
-        ("A", Action("jump", 1)),  # type: ignore[arg-type]
-        ("A", Action("lift", 4)),  # type: ignore[arg-type]
-        ("A", Action("lift", None)),
-        ("A", Action("place", 0)),  # type: ignore[arg-type]
-        ("A", Action("skip", 1)),
-        ("A", "lift 1"),
-    ],
+    ("verb", "pole"),
+    [("jump", 1), ("lift", 4), ("lift", None), ("place", 0), ("skip", 1)],
 )
-def test_step_malformed_raises(player: str, action: object) -> None:
+def test_malformed_actions_cannot_be_built(verb: str, pole: object) -> None:
+    with pytest.raises(ValueError):
+        Action(verb, pole)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("player", "action"), [("C", Action("skip")), ("A", "lift 1"), ("A", None)]
+)
+def test_step_rejects_an_unknown_player_or_a_non_action(player: str, action: object) -> None:
     with pytest.raises(ValueError):
         step(initial_state(1), player, action)  # type: ignore[arg-type]
 

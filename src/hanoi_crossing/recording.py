@@ -1,15 +1,11 @@
-"""The JSON recording format and the files that hold it (T2, T9).
+"""The JSON recording format and the files that hold it (T2, T9)::
 
-.. code-block:: json
-
-    {"n": 2, "turn_order": "AABBAABAA",
-     "moves": ["lift 1", "place 2", "skip"],
+    {"n": 2, "turn_order": "AABBAABAA", "moves": ["lift 1", "place 2", "skip"],
      "sources": ["human", "human", "timeout"]}
 
-``turn_order`` is kept separate from ``moves`` because the spec calls the turn
-order external. ``sources`` is optional and informational: a replay reproduces
-the moves exactly and keeps the original sources for display. A replay always
-restarts from the initial position; the file holds moves, never board states.
+``turn_order`` is separate because the spec calls the turn order external;
+``sources`` is optional and informational. A replay restarts from the initial
+position, so the file holds moves, never board states.
 """
 
 from __future__ import annotations
@@ -21,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .agents import ScriptedAgent
-from .engine import PLAYERS, Action, initial_state, is_positive_int
+from .engine import PLAYERS, Action, check, initial_state, is_positive_int
 from .runner import RunResult, parse_schedule, run
 
 SOURCES = ("human", "random", "scripted", "timeout")
@@ -45,45 +41,42 @@ class Recording:
         object.__setattr__(self, "moves", tuple(self.moves))
         if self.sources is not None:
             object.__setattr__(self, "sources", tuple(self.sources))
-        if not is_positive_int(self.n):
-            raise RecordingFormatError(f"n must be a positive integer, got {self.n!r}")
-        if not isinstance(self.turn_order, str):
-            raise RecordingFormatError("turn_order must be a string of A and B")
+        invalid = RecordingFormatError
+        check(is_positive_int(self.n), f"n must be a positive integer, got {self.n!r}", invalid)
+        check(isinstance(self.turn_order, str), "turn_order must be a string of A and B", invalid)
         try:
             parse_schedule(self.turn_order)
         except ValueError as e:
-            raise RecordingFormatError(str(e)) from None
-        if len(self.turn_order) != len(self.moves):
-            raise RecordingFormatError(
-                f"turn_order has {len(self.turn_order)} entries but moves has {len(self.moves)}"
-            )
-        if not all(isinstance(m, Action) for m in self.moves):
-            raise RecordingFormatError("moves must be Actions")
+            raise invalid(str(e)) from None
+        check(
+            len(self.turn_order) == len(self.moves),
+            f"turn_order has {len(self.turn_order)} entries, moves has {len(self.moves)}",
+            invalid,
+        )
+        check(all(isinstance(m, Action) for m in self.moves), "moves must be Actions", invalid)
         if self.sources is not None:
-            if len(self.sources) != len(self.moves):
-                raise RecordingFormatError("sources must have one entry per move")
-            bad = sorted(set(self.sources) - set(SOURCES))
-            if bad:
-                raise RecordingFormatError(f"unknown sources {bad}; expected {SOURCES}")
+            check(len(self.sources) == len(self.moves), "sources need one entry per move", invalid)
+            unknown = sorted(set(self.sources) - set(SOURCES))
+            check(not unknown, f"unknown sources {unknown}; expected {SOURCES}", invalid)
 
 
 # --- text and files ------------------------------------------------------------------
 
 
 def loads(text: str) -> Recording:
+    invalid = RecordingFormatError
     try:
         data = json.loads(text)
     except json.JSONDecodeError as e:
-        raise RecordingFormatError(f"not valid JSON: {e}") from None
-    if not isinstance(data, dict) or not {"n", "turn_order", "moves"} <= set(data) <= KEYS:
-        raise RecordingFormatError("recording must be an object: n, turn_order, moves[, sources]")
+        raise invalid(f"not valid JSON: {e}") from None
+    shape = isinstance(data, dict) and {"n", "turn_order", "moves"} <= set(data) <= KEYS
+    check(shape, "recording must be an object: n, turn_order, moves[, sources]", invalid)
     moves, sources = data["moves"], data.get("sources")
-    if not isinstance(moves, list) or not isinstance(sources, list | None):
-        raise RecordingFormatError("moves and sources must be lists")
+    check(isinstance(moves, list) and isinstance(sources, list | None), "expected lists", invalid)
     try:
         actions = tuple(Action.parse(m) for m in moves)
     except ValueError as e:
-        raise RecordingFormatError(str(e)) from None
+        raise invalid(str(e)) from None
     return Recording(data["n"], data["turn_order"], actions, sources)
 
 

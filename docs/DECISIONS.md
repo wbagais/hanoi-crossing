@@ -71,6 +71,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D48 | Human play is its own frontend module | Structure | 🟩 addition (A1) | active |
 | D49 | One wording for what a turn did | Structure | 🟩 addition (A5) | active |
 | D50 | Recording owns its files; CLI only wires | Structure | 🟪 engineering | active |
+| D51 | An `Action` is checked when it is built | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -513,3 +514,16 @@ Each entry has the same four parts: **Context** (what raised the question),
   prints; `--save`/`--no-save` now also apply to a continued replay.
 - **Reason:** each concern in the module that owns it; `cli.py` 498 → 280 lines.
 - **Rejected:** a separate `files.py` (one more module for three small functions).
+
+### D51. An `Action` is checked when it is built
+- **Context:** after the restructure the code was better organised but barely
+  smaller, so the author asked for a real reduction with every feature kept.
+- **Choice:** `Action.__post_init__` rejects a malformed move, so `engine._validate`
+  disappears and `step` only checks the player and the type; one `check(ok, message,
+  error)` helper replaces the repeated `if ...: raise ...` pairs in `from_dict` and
+  `Recording`; module docstrings were cut to a few lines each, with the reasoning
+  left here where it belongs.
+- **Reason:** a malformed action can no longer exist, so nothing downstream has to
+  ask; `src/` is 1 329 -> 1 183 lines (801 of them code) with all ten features.
+- **Rejected:** a table-driven `add_argument` loop (tried: 7 lines longer once
+  formatted, and harder to read); deleting features (they were asked to stay).
