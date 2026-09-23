@@ -11,9 +11,8 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
-from .agents import Agent
 from .engine import PLAYERS, Action, Outcome, Player, State, legal_actions, observe, step, winner
 
 Status = Literal["won", "unfinished", "stalemate"]
@@ -74,8 +73,8 @@ def rotate_to(pattern: str, first: Player) -> str:
 # --- the loop --------------------------------------------------------------------
 
 
-def play_turn(state: State, player: Player, agent: Agent, index: int) -> tuple[State, Turn]:
-    """Observe -> choose -> step -> record, for one schedule entry."""
+def play_turn(state: State, player: Player, agent: Any, index: int) -> tuple[State, Turn]:
+    """Observe -> choose -> step -> record, for one schedule entry (see ``agents``)."""
     action = agent.choose(observe(state, player), legal_actions(state, player))
     new_state, outcome = step(state, player, action)
     return new_state, Turn(index, player, action, outcome, agent.source)
@@ -84,7 +83,7 @@ def play_turn(state: State, player: Player, agent: Agent, index: int) -> tuple[S
 def run(
     state: State,
     schedule: Sequence[Player],
-    agents: Mapping[Player, Agent],
+    agents: Mapping[Player, Any],
     repetition_limit: int | None = None,
     on_turn: Callable[[Turn, State], None] | None = None,
 ) -> RunResult:

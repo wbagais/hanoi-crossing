@@ -10,10 +10,10 @@ PACKAGE = pathlib.Path(__file__).resolve().parent.parent / "src" / "hanoi_crossi
 ALLOWED = {
     "engine": set(),
     "agents": {"engine"},
-    "runner": {"engine", "agents"},
+    "runner": {"engine"},
     "recording": {"engine", "agents", "runner"},
     "render": {"engine", "runner"},
-    "human": {"engine", "agents", "runner", "render"},
+    "human": {"engine", "runner", "render"},
     "cli": {"engine", "agents", "runner", "recording", "render", "human"},
 }
 

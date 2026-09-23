@@ -34,10 +34,10 @@ Who may import whom (enforced by `tests/test_architecture.py`):
 |-------------|------------------------------------|
 | `engine`    | nothing                            |
 | `agents`    | engine                             |
-| `runner`    | engine, agents                     |
+| `runner`    | engine                             |
 | `recording` | engine, agents, runner             |
 | `render`    | engine, runner                     |
-| `human`     | engine, agents, runner, render     |
+| `human`     | engine, runner, render             |
 | `cli`       | everything                         |
 
 Where a new feature goes: find the innermost ring that can own it.

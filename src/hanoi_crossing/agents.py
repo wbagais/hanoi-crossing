@@ -3,23 +3,17 @@
 An agent never sees the full ``State`` (R3, T8) - this is the contract an RL policy,
 an LLM, or a network client would implement. A person at the keyboard is a frontend
 concern and lives in ``human``.
+
+An agent is anything with ``choose(observation, legal) -> Action`` and a ``source``
+string labelling the move it just chose; the runner copies that label onto the turn.
 """
 
 from __future__ import annotations
 
 import random
 from collections.abc import Iterable, Sequence
-from typing import Protocol
 
 from .engine import Action, Observation
-
-
-class Agent(Protocol):
-    """``source`` labels the move just chosen; the runner copies it onto the turn."""
-
-    source: str
-
-    def choose(self, observation: Observation, legal: Sequence[Action]) -> Action: ...
 
 
 class RandomAgent:

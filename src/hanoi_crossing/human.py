@@ -12,9 +12,8 @@ import queue
 import threading
 import time
 from collections.abc import Sequence
-from typing import IO
+from typing import IO, Any
 
-from .agents import Agent
 from .engine import Action, Observation, State
 from .render import describe_turn, move_text, render_view
 from .runner import StopGame, Turn
@@ -93,7 +92,7 @@ class HumanAgent:
         player: str,
         n: int,
         console: Console,
-        fallback: Agent,
+        fallback: Any,
         timeout: float | None = None,
         max_timeouts: int = 3,
     ) -> None:

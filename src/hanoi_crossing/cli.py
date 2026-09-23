@@ -16,9 +16,9 @@ import sys
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import IO
+from typing import IO, Any
 
-from .agents import Agent, RandomAgent
+from .agents import RandomAgent
 from .engine import Player, State, initial_state
 from .human import Console, HumanAgent, LineReader
 from .recording import (
@@ -98,7 +98,7 @@ def _play(
     args: argparse.Namespace,
     console: Console,
     start: State,
-    agents: dict[Player, Agent],
+    agents: dict[Player, Any],
     first: Player,
     title: str,
 ) -> tuple[RunResult, str]:
@@ -149,7 +149,7 @@ def cmd_game(
 ) -> int:
     """``random`` and ``play``: a fresh game between the given kinds of player."""
     rng = random.Random(args.seed)
-    agents: dict[Player, Agent] = {}
+    agents: dict[Player, Any] = {}
     for player, kind in kinds.items():
         if kind == "human":
             timeout = args.move_timeout or None
@@ -183,7 +183,7 @@ def cmd_replay(args: argparse.Namespace, out: IO[str], console: Console, isatty:
     if not args.json:
         _report(args, out, result, meta, None)  # the recorded part, before continuing
     rng = random.Random(args.seed)
-    agents: dict[Player, Agent] = {"A": RandomAgent(rng), "B": RandomAgent(rng)}
+    agents: dict[Player, Any] = {"A": RandomAgent(rng), "B": RandomAgent(rng)}
     first: Player = "B" if rec.turn_order.endswith("A") else "A"
     console.say()
     more, pattern = _play(
