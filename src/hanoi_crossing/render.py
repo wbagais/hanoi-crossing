@@ -4,8 +4,6 @@ Pure builders; nothing here prints. Style ``tower`` draws disks to scale, ``list
 uses bracket lists in the spec's cross layout.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 from .engine import SIDES, Action, Observation, State, to_dict

@@ -7,8 +7,6 @@ result, the console carries interaction; with ``--json`` the console moves to
 stderr so stdout is exactly one JSON object.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import random

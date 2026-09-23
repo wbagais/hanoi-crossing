@@ -6,8 +6,6 @@ means the fallback agent moves instead (labelled ``timeout``); ``quit``, Ctrl-C 
 ``max_timeouts`` unanswered prompts end the game.
 """
 
-from __future__ import annotations
-
 import queue
 import threading
 import time

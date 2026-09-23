@@ -8,8 +8,6 @@ An agent is anything with ``choose(observation, legal) -> Action`` and a ``sourc
 string labelling the move it just chose; the runner copies that label onto the turn.
 """
 
-from __future__ import annotations
-
 import random
 from collections.abc import Iterable, Sequence
 

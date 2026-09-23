@@ -6,8 +6,6 @@ schedule (R10), the turn log, and the non-winning exits ``unfinished`` and
 ``stalemate`` (I5).
 """
 
-from __future__ import annotations
-
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass

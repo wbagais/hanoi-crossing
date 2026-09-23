@@ -1,12 +1,10 @@
 """Hanoi Crossing rules engine: pure functions over an immutable ``State``.
 
-No I/O, no randomness, no turn counter: the caller names the acting player on
-every call, so any turn order works (R10). Actions are player-relative, so the
-opponent's private poles cannot even be expressed (R3). Rule interpretations
-I1-I7 are in docs/REQUIREMENTS.md, the reasons in docs/DECISIONS.md.
+The caller names the acting player on every call, so any turn order works (R10).
+Actions are player-relative, which is also what hides the opponent's side (R3).
+Rule interpretations I1-I7 are in docs/REQUIREMENTS.md, the reasons in
+docs/DECISIONS.md.
 """
-
-from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -56,7 +54,7 @@ class Action:
         return self.verb if self.pole is None else f"{self.verb} {self.pole}"
 
     @classmethod
-    def parse(cls, text: object) -> Action:
+    def parse(cls, text: object) -> "Action":
         """``"lift 1"`` / ``"place 3"`` / ``"skip"`` -> Action. Inverse of ``str``."""
         parts = text.split() if isinstance(text, str) else []
         if parts == ["skip"]:
