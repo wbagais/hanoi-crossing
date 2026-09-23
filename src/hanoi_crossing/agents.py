@@ -21,17 +21,13 @@ class RandomAgent:
 
     source = "random"
 
-    def __init__(self, rng: random.Random, allow_skip: bool = True) -> None:
+    def __init__(self, rng: random.Random) -> None:
         self.rng = rng
-        self.allow_skip = allow_skip
 
     def choose(self, observation: Observation, legal: Sequence[Action]) -> Action:
-        choices = list(legal)
-        if not self.allow_skip and len(choices) > 1:
-            choices = [a for a in choices if a.verb != "skip"]
-        if not choices:
+        if not legal:
             raise RuntimeError("no legal actions to choose from")
-        return self.rng.choice(choices)
+        return self.rng.choice(list(legal))
 
 
 class ScriptedAgent:

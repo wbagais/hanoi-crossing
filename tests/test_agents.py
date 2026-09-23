@@ -35,11 +35,9 @@ def test_random_agent_is_seed_reproducible() -> None:
     ]
 
 
-def test_random_agent_no_skip_avoids_skip_unless_only_option() -> None:
-    agent = RandomAgent(random.Random(0), allow_skip=False)
-    for _ in range(50):
-        assert agent.choose(_obs(), LEGAL_START) == Action("lift", 1)
-    assert agent.choose(_obs(), [Action("skip")]) == Action("skip")
+def test_random_agent_refuses_an_empty_legal_list() -> None:
+    with pytest.raises(RuntimeError):
+        RandomAgent(random.Random(0)).choose(_obs(), [])
 
 
 def test_random_agent_never_receives_a_state() -> None:

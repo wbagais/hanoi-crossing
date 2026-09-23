@@ -72,6 +72,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D49 | One wording for what a turn did | Structure | 🟩 addition (A5) | active |
 | D50 | Recording owns its files; CLI only wires | Structure | 🟪 engineering | active |
 | D51 | An `Action` is checked when it is built | Structure | 🟪 engineering | active |
+| D52 | `--no-skip` and the `Agent` protocol removed | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -527,3 +528,14 @@ Each entry has the same four parts: **Context** (what raised the question),
   ask; `src/` is 1 329 -> 1 183 lines (801 of them code) with all ten features.
 - **Rejected:** a table-driven `add_argument` loop (tried: 7 lines longer once
   formatted, and harder to read); deleting features (they were asked to stay).
+
+### D52. `--no-skip` and the `Agent` protocol removed
+- **Context:** going through the code file by file, two things had no owner: the
+  `Agent` protocol, which no type checker in this project ever checks, and
+  `--no-skip`, an option in no requirement, no decision, and nothing but a row in
+  docs/USAGE.md. `allow_skip` also made a game-wide preference a per-agent one.
+- **Choice:** delete both. The agent contract is two sentences in the `agents`
+  docstring; `RandomAgent` now takes only the generator and picks from `legal`.
+- **Reason:** nothing asked for either, and each cost lines in three files.
+- **Rejected:** keeping `--no-skip` for shorter random games (`--max-turns` and
+  `--repetition-limit` already bound a game).

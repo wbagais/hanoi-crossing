@@ -54,7 +54,6 @@ command so the spec's mode is visible by name.
 | `--n N` | required | — | Disks per player. A gets sizes 1, 3, …, 2N−1; B gets 2, 4, …, 2N. |
 | `--first A\|B` | optional | `A` | Who takes turn 1. Rotates the schedule pattern to that player's first occurrence: `AB` → `BA`, `AAB` → `BAA`. Error (exit 2) if the pattern has no such player. |
 | `--schedule P` | optional | `AB` | Turn-order pattern, letters A and B only, repeated to fill `--max-turns`. `AAB` gives A two turns then B one; `A` lets A play alone. Printed before turn 1. |
-| `--no-skip` | optional | off | Random players never choose skip unless it is the only legal action. |
 
 Autosave: every finished game, whatever its status, is written once at the end to
 `recordings/<date>-<time>-<mode>-n<N>-seed<S>.json`, and the path is printed. The

@@ -65,7 +65,6 @@ def build_parser() -> argparse.ArgumentParser:
     fresh = argparse.ArgumentParser(add_help=False)  # commands starting a new game
     fresh.add_argument("--n", type=int, required=True, help="disks per player")
     fresh.add_argument("--first", choices=("A", "B"), default="A", help="who takes turn 1")
-    fresh.add_argument("--no-skip", action="store_true", help="random agents avoid skip")
 
     human = argparse.ArgumentParser(add_help=False)  # only where a person can play
     human.add_argument("--a", choices=("random", "human"), required=True, help="A's moves")
@@ -157,7 +156,7 @@ def cmd_game(
                 player, args.n, console, RandomAgent(rng), timeout, args.max_timeouts
             )
         else:
-            agents[player] = RandomAgent(rng, allow_skip=not args.no_skip)
+            agents[player] = RandomAgent(rng)
     title = f"Hanoi Crossing  n={args.n}  A: {kinds['A']}  B: {kinds['B']}"
     result, pattern = _play(args, console, initial_state(args.n), agents, args.first, title)
     mode = "random" if set(kinds.values()) == {"random"} else "play"
