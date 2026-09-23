@@ -9,11 +9,9 @@ schedule (R10), the turn log, and the non-winning exits ``unfinished`` and
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
-from .engine import PLAYERS, Action, Outcome, Player, State, legal_actions, observe, step, winner
-
-Status = Literal["won", "unfinished", "stalemate"]
+from .engine import PLAYERS, Action, Outcome, State, legal_actions, observe, step, winner
 
 
 class StopGame(Exception):
@@ -25,7 +23,7 @@ class Turn:
     """One played turn. ``source`` is the label the agent gave its move."""
 
     index: int
-    player: Player
+    player: str
     action: Action
     outcome: Outcome
     source: str
@@ -35,23 +33,23 @@ class Turn:
 class RunResult:
     final_state: State
     turns: tuple[Turn, ...]
-    status: Status
-    winner: Player | None
+    status: str  # won | unfinished | stalemate
+    winner: str | None
     unplayed: int
 
 
 # --- schedules -------------------------------------------------------------------
 
 
-def parse_schedule(text: str) -> tuple[Player, ...]:
+def parse_schedule(text: str) -> tuple[str, ...]:
     """``"ABA"`` -> ``("A", "B", "A")``. Only A and B are allowed."""
     bad = sorted(set(text) - set(PLAYERS))
     if bad:
         raise ValueError(f"schedule may only contain A and B, got {bad}")
-    return tuple(text)  # type: ignore[return-value]
+    return tuple(text)
 
 
-def repeat(pattern: str, length: int) -> tuple[Player, ...]:
+def repeat(pattern: str, length: int) -> tuple[str, ...]:
     """Repeat ``pattern`` (e.g. ``"AB"``, ``"AAB"``) to exactly ``length`` entries."""
     players = parse_schedule(pattern)
     if not players:
@@ -59,7 +57,7 @@ def repeat(pattern: str, length: int) -> tuple[Player, ...]:
     return tuple(players[i % len(players)] for i in range(length))
 
 
-def rotate_to(pattern: str, first: Player) -> str:
+def rotate_to(pattern: str, first: str) -> str:
     """Rotate ``pattern`` so it starts at the first occurrence of ``first``."""
     parse_schedule(pattern)
     if first not in pattern:
@@ -71,7 +69,7 @@ def rotate_to(pattern: str, first: Player) -> str:
 # --- the loop --------------------------------------------------------------------
 
 
-def play_turn(state: State, player: Player, agent: Any, index: int) -> tuple[State, Turn]:
+def play_turn(state: State, player: str, agent: Any, index: int) -> tuple[State, Turn]:
     """Observe -> choose -> step -> record, for one schedule entry (see ``agents``)."""
     action = agent.choose(observe(state, player), legal_actions(state, player))
     new_state, outcome = step(state, player, action)
@@ -80,8 +78,8 @@ def play_turn(state: State, player: Player, agent: Any, index: int) -> tuple[Sta
 
 def run(
     state: State,
-    schedule: Sequence[Player],
-    agents: Mapping[Player, Any],
+    schedule: Sequence[str],
+    agents: Mapping[str, Any],
     repetition_limit: int | None = None,
     on_turn: Callable[[Turn, State], None] | None = None,
 ) -> RunResult:
@@ -93,7 +91,7 @@ def run(
     each turn without owning the loop.
     """
     turns: list[Turn] = []
-    seen: Counter[tuple[State, Player]] = Counter()
+    seen: Counter[tuple[State, str]] = Counter()
     for i, player in enumerate(schedule):
         unplayed = len(schedule) - i
         won = winner(state)

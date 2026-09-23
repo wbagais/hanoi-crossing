@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from .agents import RandomAgent
-from .engine import Player, State, initial_state
+from .engine import State, initial_state
 from .human import Console, HumanAgent, LineReader
 from .recording import (
     Recording,
@@ -95,8 +95,8 @@ def _play(
     args: argparse.Namespace,
     console: Console,
     start: State,
-    agents: dict[Player, Any],
-    first: Player,
+    agents: dict[str, Any],
+    first: str,
     title: str,
 ) -> tuple[RunResult, str]:
     """Run a fresh schedule from ``start``; returns the result and the pattern used."""
@@ -142,11 +142,11 @@ def _report(
 
 
 def cmd_game(
-    args: argparse.Namespace, out: IO[str], console: Console, kinds: dict[Player, str]
+    args: argparse.Namespace, out: IO[str], console: Console, kinds: dict[str, str]
 ) -> int:
     """``random`` and ``play``: a fresh game between the given kinds of player."""
     rng = random.Random(args.seed)
-    agents: dict[Player, Any] = {}
+    agents: dict[str, Any] = {}
     for player, kind in kinds.items():
         if kind == "human":
             timeout = args.move_timeout or None
@@ -180,8 +180,8 @@ def cmd_replay(args: argparse.Namespace, out: IO[str], console: Console, isatty:
     if not args.json:
         _report(args, out, result, meta, None)  # the recorded part, before continuing
     rng = random.Random(args.seed)
-    agents: dict[Player, Any] = {"A": RandomAgent(rng), "B": RandomAgent(rng)}
-    first: Player = "B" if rec.turn_order.endswith("A") else "A"
+    agents: dict[str, Any] = {"A": RandomAgent(rng), "B": RandomAgent(rng)}
+    first = "B" if rec.turn_order.endswith("A") else "A"
     console.say()
     more, pattern = _play(
         args, console, result.final_state, agents, first, "continuing with random agents"

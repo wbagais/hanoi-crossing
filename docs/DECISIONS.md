@@ -73,6 +73,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D50 | Recording owns its files; CLI only wires | Structure | 🟪 engineering | active |
 | D51 | An `Action` is checked when it is built | Structure | 🟪 engineering | active |
 | D52 | `--no-skip` and the `Agent` protocol removed | Structure | 🟪 engineering | active |
+| D53 | Plain tuples instead of `Literal` aliases | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -539,3 +540,15 @@ Each entry has the same four parts: **Context** (what raised the question),
 - **Reason:** nothing asked for either, and each cost lines in three files.
 - **Rejected:** keeping `--no-skip` for shorter random games (`--max-turns` and
   `--repetition-limit` already bound a game).
+
+### D53. Plain tuples instead of `Literal` aliases
+- **Context:** `Player`, `Verb`, `PoleIndex` and `Status` were `Literal` types, and
+  the same values were written again as runtime tuples and as inline checks. No type
+  checker runs here, so the aliases only cost a second copy of each value.
+- **Choice:** keep one tuple per set (`PLAYERS`, `VERBS`, `POLES`, `POLE_KEYS`) and
+  hint with `str` / `int`. `Action.__post_init__` checks against `VERBS` and `POLES`,
+  so every value is written once. The 6 `# type: ignore` comments the aliases needed
+  are gone too.
+- **Reason:** one source per value; nothing was verifying the narrower hints.
+- **Rejected:** `get_args(Literal[...])` to derive the tuples (keeps the meaning in
+  the hints, but adds an import and a layer for a reader to follow).

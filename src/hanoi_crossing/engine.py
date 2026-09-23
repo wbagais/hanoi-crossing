@@ -8,17 +8,14 @@ docs/DECISIONS.md.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
 
-Player = Literal["A", "B"]
-Verb = Literal["lift", "place", "skip"]
-PoleIndex = Literal[1, 2, 3]
-
-PLAYERS: tuple[Player, ...] = ("A", "B")
-POLE_KEYS: tuple[str, ...] = ("1a", "2", "3a", "1b", "3b")
+PLAYERS = ("A", "B")
+VERBS = ("lift", "place", "skip")
+POLES = (1, 2, 3)
+POLE_KEYS = ("1a", "2", "3a", "1b", "3b")  # serialization order
 SHARED = "2"
 
-SIDES: dict[Player, dict[int, str]] = {
+SIDES: dict[str, dict[int, str]] = {
     "A": {1: "1a", 2: SHARED, 3: "3a"},
     "B": {1: "1b", 2: SHARED, 3: "3b"},
 }
@@ -40,15 +37,15 @@ def check(ok: object, message: str, error: type[Exception] = ValueError) -> None
 class Action:
     """One move, checked on construction: lift/place need a pole, skip must not have one (I3)."""
 
-    verb: Verb
-    pole: PoleIndex | None = None
+    verb: str
+    pole: int | None = None
 
     def __post_init__(self) -> None:
-        check(self.verb in ("lift", "place", "skip"), f"unknown verb {self.verb!r}")
+        check(self.verb in VERBS, f"unknown verb {self.verb!r}")
         if self.verb == "skip":
             check(self.pole is None, "skip takes no pole")
         else:
-            check(self.pole in (1, 2, 3), f"pole must be 1, 2 or 3, got {self.pole!r}")
+            check(self.pole in POLES, f"pole must be 1, 2 or 3, got {self.pole!r}")
 
     def __str__(self) -> str:
         return self.verb if self.pole is None else f"{self.verb} {self.pole}"
@@ -60,7 +57,7 @@ class Action:
         if parts == ["skip"]:
             return cls("skip")
         if len(parts) == 2 and parts[0] in ("lift", "place") and parts[1] in ("1", "2", "3"):
-            return cls(parts[0], int(parts[1]))  # type: ignore[arg-type]
+            return cls(parts[0], int(parts[1]))
         raise ValueError(f"bad move {text!r}; expected 'lift N', 'place N' (N=1..3) or 'skip'")
 
 
@@ -82,7 +79,7 @@ class State:
 
     n: int
     poles: Mapping[str, tuple[int, ...]]
-    hands: Mapping[Player, int | None]
+    hands: Mapping[str, int | None]
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "poles", {k: tuple(v) for k, v in self.poles.items()})
@@ -115,18 +112,18 @@ class Outcome:
 
     legal: bool
     reason: str | None
-    winner: Player | None
+    winner: str | None
     done: bool
     disk: int | None = None
 
 
-def _require_player(player: object) -> Player:
+def _require_player(player: object) -> str:
     if player not in PLAYERS:
         raise ValueError(f"unknown player {player!r}; expected one of {PLAYERS}")
-    return player  # type: ignore[return-value]
+    return player
 
 
-def pole_key(player: Player, pole: int) -> str:
+def pole_key(player: str, pole: int) -> str:
     """Map a player-relative pole number (1, 2, 3) to a State pole key."""
     try:
         return SIDES[_require_player(player)][pole]
@@ -150,7 +147,7 @@ def initial_state(n: int) -> State:
     )
 
 
-def observe(state: State, player: Player) -> Observation:
+def observe(state: State, player: str) -> Observation:
     """The partial view a player is allowed to see (R3). Never the opponent's side."""
     side = SIDES[_require_player(player)]
     return Observation(
@@ -159,7 +156,7 @@ def observe(state: State, player: Player) -> Observation:
     )
 
 
-def winner(state: State) -> Player | None:
+def winner(state: State) -> str | None:
     """The player whose hand, pole 1 and shared pole are empty and pole 3 is not (R11, I1).
 
     At most one player can satisfy this in a reachable state, so the first match wins.
@@ -176,11 +173,11 @@ def winner(state: State) -> Player | None:
     return None
 
 
-def _illegal_reason(state: State, player: Player, action: Action) -> str | None:
+def _illegal_reason(state: State, player: str, action: Action) -> str | None:
     """Why a well-formed action is illegal in this position, or None if legal."""
     if action.verb == "skip":
         return None
-    pole = state.poles[pole_key(player, action.pole)]  # type: ignore[arg-type]
+    pole = state.poles[pole_key(player, action.pole)]
     held = state.hands[player]
     if action.verb == "lift":
         if held is not None:
@@ -195,7 +192,7 @@ def _illegal_reason(state: State, player: Player, action: Action) -> str | None:
     return None
 
 
-def legal_actions(state: State, player: Player) -> list[Action]:
+def legal_actions(state: State, player: str) -> list[Action]:
     """Actions ``step`` would accept now, in ALL_ACTIONS order. Empty once the game is over."""
     _require_player(player)
     if winner(state) is not None:
@@ -203,7 +200,7 @@ def legal_actions(state: State, player: Player) -> list[Action]:
     return [a for a in ALL_ACTIONS if _illegal_reason(state, player, a) is None]
 
 
-def step(state: State, player: Player, action: Action) -> tuple[State, Outcome]:
+def step(state: State, player: str, action: Action) -> tuple[State, Outcome]:
     """Apply one action: over? -> malformed? -> illegal here? -> apply -> who won?
 
     An illegal action returns the very same ``state`` object, so a wasted turn is
@@ -219,7 +216,7 @@ def step(state: State, player: Player, action: Action) -> tuple[State, Outcome]:
         return state, Outcome(False, reason, None, False)
     if action.verb == "skip":
         return state, Outcome(True, None, None, False)
-    key = pole_key(player, action.pole)  # type: ignore[arg-type]
+    key = pole_key(player, action.pole)
     poles = dict(state.poles)
     hands = dict(state.hands)
     if action.verb == "lift":
@@ -228,7 +225,7 @@ def step(state: State, player: Player, action: Action) -> tuple[State, Outcome]:
         hands[player] = disk
     else:
         disk = hands[player]
-        poles[key] = poles[key] + (disk,)  # type: ignore[operator]
+        poles[key] = poles[key] + (disk,)
         hands[player] = None
     new = State(n=state.n, poles=poles, hands=hands)
     won = winner(new)
@@ -247,8 +244,8 @@ def to_dict(state: State) -> dict:
 def from_dict(data: object) -> State:
     """Rebuild a State from ``to_dict`` output, validating shape and types."""
     check(isinstance(data, dict), "state must be a dict with the keys n, poles, hands")
-    check(set(data) == {"n", "poles", "hands"}, "state needs exactly the keys n, poles, hands")  # type: ignore[arg-type]
-    n, poles, hands = data["n"], data["poles"], data["hands"]  # type: ignore[index]
+    check(set(data) == {"n", "poles", "hands"}, "state needs the keys n, poles, hands")
+    n, poles, hands = data["n"], data["poles"], data["hands"]
     check(is_positive_int(n), f"n must be a positive integer, got {n!r}")
     check(isinstance(poles, dict) and set(poles) == set(POLE_KEYS), f"poles need keys {POLE_KEYS}")
     check(isinstance(hands, dict) and set(hands) == set(PLAYERS), f"hands need keys {PLAYERS}")
