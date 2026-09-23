@@ -105,30 +105,25 @@ class Observation:
 
 @dataclass(frozen=True)
 class Outcome:
-    """Result of one ``step``. ``winner``/``done`` reflect the returned state.
+    """Result of one ``step``, as three facts about the state it returned."""
 
-    ``disk`` is the disk that was lifted or placed; None for skip and illegal moves.
-    """
+    reason: str | None = None  # why the move was refused, if it was
+    winner: str | None = None  # who has won
+    disk: int | None = None  # the disk lifted or placed
 
-    legal: bool
-    reason: str | None
-    winner: str | None
-    done: bool
-    disk: int | None = None
+    @property
+    def legal(self) -> bool:
+        return self.reason is None
+
+    @property
+    def done(self) -> bool:
+        return self.winner is not None
 
 
 def _require_player(player: object) -> str:
-    if player not in PLAYERS:
-        raise ValueError(f"unknown player {player!r}; expected one of {PLAYERS}")
+    """Every public function checks the player once; the internals then trust it."""
+    check(player in PLAYERS, f"unknown player {player!r}; expected one of {PLAYERS}")
     return player
-
-
-def pole_key(player: str, pole: int) -> str:
-    """Map a player-relative pole number (1, 2, 3) to a State pole key."""
-    try:
-        return SIDES[_require_player(player)][pole]
-    except KeyError:
-        raise ValueError(f"pole must be 1, 2 or 3, got {pole!r}") from None
 
 
 def initial_state(n: int) -> State:
@@ -177,7 +172,7 @@ def _illegal_reason(state: State, player: str, action: Action) -> str | None:
     """Why a well-formed action is illegal in this position, or None if legal."""
     if action.verb == "skip":
         return None
-    pole = state.poles[pole_key(player, action.pole)]
+    pole = state.poles[SIDES[player][action.pole]]
     held = state.hands[player]
     if action.verb == "lift":
         if held is not None:
@@ -210,13 +205,13 @@ def step(state: State, player: str, action: Action) -> tuple[State, Outcome]:
     check(isinstance(action, Action), f"action must be an Action, got {action!r}")
     already = winner(state)
     if already is not None:
-        return state, Outcome(False, "game is over", already, True)
+        return state, Outcome("game is over", already)
     reason = _illegal_reason(state, player, action)
     if reason is not None:
-        return state, Outcome(False, reason, None, False)
+        return state, Outcome(reason)
     if action.verb == "skip":
-        return state, Outcome(True, None, None, False)
-    key = pole_key(player, action.pole)
+        return state, Outcome()
+    key = SIDES[player][action.pole]
     poles = dict(state.poles)
     hands = dict(state.hands)
     if action.verb == "lift":
@@ -229,7 +224,7 @@ def step(state: State, player: str, action: Action) -> tuple[State, Outcome]:
         hands[player] = None
     new = State(n=state.n, poles=poles, hands=hands)
     won = winner(new)
-    return new, Outcome(True, None, won, won is not None, disk)
+    return new, Outcome(winner=won, disk=disk)
 
 
 def to_dict(state: State) -> dict:

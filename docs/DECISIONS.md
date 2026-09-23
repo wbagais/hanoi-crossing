@@ -74,6 +74,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D51 | An `Action` is checked when it is built | Structure | 🟪 engineering | active |
 | D52 | `--no-skip` and the `Agent` protocol removed | Structure | 🟪 engineering | active |
 | D53 | Plain tuples instead of `Literal` aliases | Structure | 🟪 engineering | active |
+| D54 | `Outcome` keeps only what it cannot derive | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -552,3 +553,18 @@ Each entry has the same four parts: **Context** (what raised the question),
 - **Reason:** one source per value; nothing was verifying the narrower hints.
 - **Rejected:** `get_args(Literal[...])` to derive the tuples (keeps the meaning in
   the hints, but adds an import and a layer for a reader to follow).
+
+### D54. `Outcome` keeps only what it cannot derive
+- **Context:** `Outcome(legal, reason, winner, done, disk)` held two fields that
+  restated others: `legal` was always `reason is None`, `done` always `winner is not
+  None`, and nothing outside the tests read `done`. Two fields that could contradict
+  the rest. The acting player was also validated twice per `step`, and seven times
+  per `legal_actions`, because `pole_key` re-checked what its caller had checked.
+- **Choice:** `Outcome` stores `reason`, `winner`, `disk`; `legal` and `done` are
+  properties. `step` now reads `Outcome("game is over", already)`, `Outcome(reason)`,
+  `Outcome()`, `Outcome(winner=won, disk=disk)`. `pole_key` is gone: the public
+  functions check the player once with `_require_player`, and the internals index
+  `SIDES` directly.
+- **Reason:** fewer facts to keep consistent, and each checked once.
+- **Rejected:** keeping `done` for callers who prefer a flag (the property reads the
+  same at the call site).

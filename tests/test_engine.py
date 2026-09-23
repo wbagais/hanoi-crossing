@@ -165,7 +165,7 @@ def test_legal_actions_order_follows_all_actions() -> None:
 def test_step_lift_and_place_change_state() -> None:
     s0 = initial_state(1)
     s1, out = step(s0, "A", Action("lift", 1))
-    assert out == Outcome(legal=True, reason=None, winner=None, done=False, disk=1)
+    assert out == Outcome(disk=1)
     assert s1.poles["1a"] == () and s1.hands["A"] == 1
     assert s0.poles["1a"] == (1,), "old state must be untouched"
     s2, out = step(s1, "A", Action("place", 2))
@@ -204,7 +204,7 @@ def test_step_illegal_reports_reason_and_returns_same_object(
 ) -> None:
     s2, out = step(state, player, action)  # type: ignore[arg-type]
     assert s2 is state
-    assert out == Outcome(legal=False, reason=reason, winner=None, done=False)
+    assert out == Outcome(reason)
 
 
 @pytest.mark.parametrize(
@@ -257,7 +257,7 @@ def test_spec_example_n1_a_wins_in_three_steps() -> None:
     s, o2 = step(s, "B", Action("lift", 1))
     s, o3 = step(s, "A", Action("place", 3))
     assert (o1.done, o2.done) == (False, False)
-    assert o3 == Outcome(legal=True, reason=None, winner="A", done=True, disk=1)
+    assert o3 == Outcome(winner="A", disk=1)
     assert winner(s) == "A"
     assert s.poles["3a"] == (1,) and s.hands["B"] == 2
 
@@ -275,7 +275,7 @@ def test_opponents_lift_from_shared_pole_hands_over_the_win() -> None:
     s = make({"3a": (5, 3, 1), "2": (6,), "1b": (4, 2)})
     assert winner(s) is None
     s2, out = step(s, "B", Action("lift", 2))
-    assert out == Outcome(legal=True, reason=None, winner="A", done=True, disk=6)
+    assert out == Outcome(winner="A", disk=6)
     assert winner(s2) == "A"
 
 
@@ -297,7 +297,7 @@ def test_finished_game_rejects_every_action_including_skip() -> None:
         for a in ALL_ACTIONS:
             s2, out = step(s, p, a)
             assert s2 is s
-            assert out == Outcome(legal=False, reason="game is over", winner="A", done=True)
+            assert out == Outcome("game is over", "A")
 
 
 def _hanoi(n: int, src: int, dst: int, aux: int) -> list[tuple[int, int]]:

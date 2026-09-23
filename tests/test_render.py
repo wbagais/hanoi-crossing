@@ -94,7 +94,7 @@ def _result(turns: list[Turn], status: str = "won", winner: str | None = "A") ->
 def _turn(
     i: int, p: str, a: Action, legal: bool = True, source: str = "random", disk: int | None = 1
 ) -> Turn:
-    out = Outcome(legal, None if legal else "hand is empty", None, False, disk if legal else None)
+    out = Outcome(None if legal else "hand is empty", None, disk if legal else None)
     return Turn(i, p, a, out, source)  # type: ignore[arg-type]
 
 
