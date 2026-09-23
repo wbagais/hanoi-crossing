@@ -7,7 +7,7 @@ import pytest
 
 from hanoi_crossing.agents import RandomAgent, ScriptedAgent
 from hanoi_crossing.engine import Action, initial_state, legal_actions, observe
-from hanoi_crossing.human import Console, HumanAgent, LineReader, Timeout
+from hanoi_crossing.human import Console, HumanAgent, LineReader
 from hanoi_crossing.runner import StopGame
 
 
@@ -36,7 +36,7 @@ def test_end_of_input_lets_the_fallback_move_and_labels_it_timeout() -> None:
 def test_no_answer_in_time_lets_the_fallback_move() -> None:
     class NeverAnswers(LineReader):
         def get(self, timeout: float | None) -> str | None:
-            raise Timeout
+            raise TimeoutError
 
     console = Console(NeverAnswers(io.StringIO()), io.StringIO())
     agent = HumanAgent("A", 1, console, RandomAgent(random.Random(0)), timeout=0.02)

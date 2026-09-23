@@ -20,10 +20,6 @@ QUIT_WORDS = ("quit", "q", "exit")
 PROMPT_HELP = "not a move, try again: lift N | place N | skip  (N = 1, 2, 3)"
 
 
-class Timeout(Exception):
-    """No line arrived before the deadline."""
-
-
 class LineReader:
     """Reads stdin lines on a thread so a prompt can give up after a timeout."""
 
@@ -38,14 +34,14 @@ class LineReader:
         self._queue.put(None)
 
     def get(self, timeout: float | None) -> str | None:
-        """Next line, or None at end of input. Raises Timeout when time runs out."""
+        """Next line, None at end of input, ``TimeoutError`` when time runs out."""
         if not self._started:
             self._started = True
             threading.Thread(target=self._pump, daemon=True).start()
         try:
             line = self._queue.get(timeout=timeout)
         except queue.Empty:
-            raise Timeout from None
+            raise TimeoutError from None
         if line is None:
             self._queue.put(None)  # stay at end of input for every later call
         return line
@@ -124,7 +120,7 @@ class HumanAgent:
             remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
             try:
                 line = self.console.prompt(f"{self.player}> ", remaining)
-            except Timeout:
+            except TimeoutError:
                 line = None
             except KeyboardInterrupt:
                 self.console.say()

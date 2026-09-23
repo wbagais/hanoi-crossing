@@ -87,18 +87,14 @@ ignores three prompts in a row is treated as gone. The game ends as `unfinished`
 is autosaved, and can be continued later with `replay --continue`. Random players
 never make illegal moves; only humans and recordings can.
 
-Every flag, default, and exit code is in [`docs/USAGE.md`](docs/USAGE.md). The
-essentials: `--seed` (default 0, so runs are reproducible), `--trace` to show every
-turn, `--list` for the compact board, `--json` for machines, `--first` and
-`--schedule` for the turn order, `--max-turns` (default 200 × 3ⁿ), `--save` /
-`--no-save` around the autosave. `uv run hanoi <command> --help` prints the same.
+Every flag, default, and exit code is in [`docs/USAGE.md`](docs/USAGE.md), or
+`uv run hanoi <command> --help`. Runs are reproducible: `--seed` defaults to 0.
 
 ### Output formats
 
-By default a finished game prints the final board and a summary. `--trace` adds
-the full game first, one line per turn with its source. Drawn towers by default;
-`--list` for bracket lists in the spec's cross layout; `--json` for machines. A
-human turn:
+A finished game prints the final board and a summary; `--trace` puts the whole
+game first, one line per turn. Towers by default, `--list` for the spec's cross
+layout, `--json` for machines. A human turn:
 
 ```
 Turn 4, player B                     hand: (2)
@@ -115,31 +111,8 @@ B> place 2
   illegal: disk 2 cannot go on disk 1. Turn wasted.
 ```
 
-The final board shows both sides, then a summary:
+The final board shows both sides, then:
 `status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0`.
-
-With `--list` the same final position is the spec's cross layout, poles as
-bracket lists bottom to top (this is `examples/n3_blocked_win.json`; A won with
-B's disk 6 still in B's hand):
-
-```
-                 1a: []
-                  |
-  1b: [4, 2] --- [2]: [] --- 3b: []
-                  |
-                 3a: [5, 3, 1]
-  hand A: -   hand B: 6
-
-status won · winner A · played 44 · illegal 2 · skipped 7 · timeouts 0 · unplayed 0
-```
-
-A human turn in list style is three lines:
-
-```
-Turn 4, player B                     hand: 2
-  pole 1: [4]   pole 2: [1]   pole 3: []
-  legal: place 1, place 3, skip
-```
 
 ## Design
 
@@ -171,21 +144,14 @@ Additions beyond the spec live in rings 3 and 4 and never change the engine.
 
 ### Interpretations
 
-Where the spec is silent, we decided (I1–I7 in `docs/REQUIREMENTS.md`):
-
-1. **All visible poles empty is not a win.** Pole 3 must hold a disk.
-2. **Poles are named from the actor's side**, 1 / 2 / 3. "A lifts from 1b" cannot
-   even be expressed, which removes a whole class of invalid input.
-3. **Malformed input raises; a well-formed but illegal move wastes the turn** and
-   reports why. Garbage is a programming error, an illegal move is part of the game.
-4. **A finished game is frozen.** Every further action, even skip, is rejected.
-5. **Three ways a game ends:** *won*; *stalemate* when the same position with the
-   same player to move has occurred K times (the spec has no exit besides winning,
-   and two skipping players must terminate); *unfinished* when the schedule runs out.
-6. **Both players are checked for a win after every action**, because an opponent's
-   move can complete yours.
-7. **Ownership is not tracked after setup.** Any player may lift any top disk from
-   pole 2 and build with it; the win condition never mentions whose disks they are.
+Where the spec is silent we decided, and wrote it down (I1-I7 in
+[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md), reasoned in the decision log). The
+ones that shape the code: pole 3 must hold a disk to win, so an empty board is not a
+win; poles are named from the actor's side, so the opponent's poles cannot even be
+addressed; malformed input raises while a legal-looking but illegal move wastes the
+turn; a finished game rejects everything; a game ends won, stalemate or unfinished;
+both players are checked after every action, because an opponent's move can complete
+yours; disk ownership is not tracked after setup.
 
 ### Engine (`engine.py`, 263 lines)
 
@@ -288,18 +254,10 @@ output.
 
 ### Rejected alternatives
 
-One line each; the full reasoning is in the decision log.
-
-- A mutable `Game` object with internal counters: harder to snapshot, share, and
-  replay than a value.
-- A "game type" concept: loses mixed agents, which RL needs (learning agent versus
-  fixed opponent).
-- A player-tagged list of steps as the recording format: turn order becomes implicit.
-- Starter chosen by the seed: surprising; `--first` rotates the pattern instead.
-- A repetition limit on by default: random walkers on a finite board always repeat
-  positions eventually, so large random games ended as stalemates; it is now opt-in.
-- Writing the recording after every turn: unnecessary; once at the end is enough.
-- Poetry, Docker, HTML docs, a pytest pre-commit hook: see D10.
+A mutable `Game` object, a "game type" concept, a player-tagged move list as the
+file format, a seed-chosen starter, stalemate detection on by default, writing the
+recording after every turn, and Poetry/Docker/HTML docs. Each is in the decision log
+with its reason.
 
 ### Future work
 

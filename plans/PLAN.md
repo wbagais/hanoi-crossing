@@ -1,9 +1,10 @@
 # Hanoi Crossing — plan
 
-The plan as approved before implementation, kept as part of the journey. Each stage
-has a status line below its heading; all are done. Flags and defaults changed after
-stage 4 (decisions D38–D44); `docs/USAGE.md` is the current reference and
-`docs/DECISIONS.md` the log.
+The plan as approved before implementation, kept as part of the journey. All stages
+are done. It describes the code as it was planned, not as it stands: flags changed
+after stage 4 (D38-D44) and the modules were restructured after review (D45-D54), so
+`CLAUDE.md` holds the current blueprint, `docs/USAGE.md` the current flags, and
+`docs/DECISIONS.md` the reasoning.
 
 ## 1. Decisions
 
