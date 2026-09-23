@@ -44,10 +44,10 @@ def _towers(columns: Sequence[tuple[str, Sequence[int]]], n: int) -> list[str]:
     return lines
 
 
-def _hand(held: int | None, style: str) -> str:
+def _hand(held: int | None, as_list: bool) -> str:
     if held is None:
         return "-"
-    return f"({held})" if style == "tower" else str(held)
+    return str(held) if as_list else f"({held})"
 
 
 def _brackets(disks: Sequence[int]) -> str:
@@ -60,27 +60,26 @@ def render_view(
     index: int,
     n: int,
     legal: Sequence[Action],
-    style: str = "tower",
+    as_list: bool = False,
     seconds: float | None = None,
 ) -> str:
     """One player's view before their move: header, poles, legal actions."""
-    header = (
-        f"{f'Turn {index}, player {player}':<{TITLE_WIDTH}}hand: {_hand(observation.hand, style)}"
-    )
+    hand = _hand(observation.hand, as_list)
+    header = f"{f'Turn {index}, player {player}':<{TITLE_WIDTH}}hand: {hand}"
     legal_text = "legal: " + ", ".join(str(a) for a in legal)
     if seconds is not None:
         legal_text += f"       ({seconds:g} s)"
-    if style == "list":
+    if as_list:
         poles = "   ".join(f"pole {i}: {_brackets(observation.poles[i])}" for i in (1, 2, 3))
         return "\n".join([header, "  " + poles, "  " + legal_text])
     columns = [(f"pole {i}", observation.poles[i]) for i in (1, 2, 3)]
     return "\n".join([header, "", *_towers(columns, n), "", "  " + legal_text])
 
 
-def render_board(state: State, style: str = "tower") -> str:
+def render_board(state: State, as_list: bool = False) -> str:
     """The full final board, both sides (R12)."""
     p, hands = state.poles, state.hands
-    if style == "list":
+    if as_list:
         middle = (
             f"  1b: {_brackets(p['1b'])} --- [2]: {_brackets(p['2'])} --- 3b: {_brackets(p['3b'])}"
         )
@@ -92,7 +91,7 @@ def render_board(state: State, style: str = "tower") -> str:
                 middle,
                 f"{pad} |",
                 f"{pad}3a: {_brackets(p['3a'])}",
-                f"  hand A: {_hand(hands['A'], style)}   hand B: {_hand(hands['B'], style)}",
+                f"  hand A: {_hand(hands['A'], True)}   hand B: {_hand(hands['B'], True)}",
             ]
         )
     lines: list[str] = []
@@ -101,7 +100,7 @@ def render_board(state: State, style: str = "tower") -> str:
             lines.append("")
         columns = [(side[1], p[side[1]]), ("[2]", p[side[2]]), (side[3], p[side[3]])]
         title = f"{player} side"
-        lines += [f"{title:<{TITLE_WIDTH}}hand {player}: {_hand(hands[player], style)}", ""]
+        lines += [f"{title:<{TITLE_WIDTH}}hand {player}: {_hand(hands[player], False)}", ""]
         lines += _towers(columns, state.n)
     return "\n".join(lines)
 

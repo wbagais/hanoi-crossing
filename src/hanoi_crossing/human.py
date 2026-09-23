@@ -50,10 +50,10 @@ class LineReader:
 class Console:
     """The terminal side of one game: prompts in, turn results out."""
 
-    def __init__(self, reader: LineReader, chat: IO[str], style: str = "tower") -> None:
+    def __init__(self, reader: LineReader, chat: IO[str], as_list: bool = False) -> None:
         self.reader = reader
         self.chat = chat
-        self.style = style
+        self.as_list = as_list
         self.turns_played = 0
 
     def say(self, text: str = "") -> None:
@@ -99,9 +99,10 @@ class HumanAgent:
         console = self.console
         index = console.turns_played + 1
         console.say()
-        console.say(
-            render_view(observation, self.player, index, self.n, legal, console.style, self.timeout)
+        view = render_view(
+            observation, self.player, index, self.n, legal, console.as_list, self.timeout
         )
+        console.say(view)
         action = self._read_move()
         if action is not None:
             self.unanswered = 0

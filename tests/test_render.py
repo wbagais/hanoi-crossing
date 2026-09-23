@@ -55,7 +55,7 @@ def test_tower_view_shows_countdown_when_given() -> None:
 
 def test_list_view_uses_bracket_lists() -> None:
     s = _state(2, {"1a": (3,), "2": (1,)}, {"A": 4, "B": None})
-    text = render_view(observe(s, "A"), "A", 4, 2, [Action("place", 3)], style="list")
+    text = render_view(observe(s, "A"), "A", 4, 2, [Action("place", 3)], as_list=True)
     assert text.splitlines()[0].endswith("hand: 4")
     assert "pole 1: [3]   pole 2: [1]   pole 3: []" in text
     assert "legal: place 3" in text
@@ -74,7 +74,7 @@ def test_board_tower_style_shows_both_sides() -> None:
 
 def test_board_list_style_uses_spec_cross_layout() -> None:
     s = _state(2, {"1a": (3, 1), "1b": (4,), "3b": (2,)})
-    text = render_board(s, style="list")
+    text = render_board(s, as_list=True)
     lines = [line.rstrip() for line in text.splitlines()]
     assert lines[0].strip() == "1a: [3, 1]"
     assert lines[1].strip() == "|"

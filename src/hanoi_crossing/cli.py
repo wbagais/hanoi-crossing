@@ -129,10 +129,9 @@ def _report(
         payload = {**meta, **result_dict(result), "saved": str(saved) if saved else None}
         out.write(json.dumps(payload, indent=2) + "\n")
         return
-    style = "list" if args.list else "tower"
     if args.trace and result.turns:
         out.write("\n" + render_trace(result.turns) + "\n")
-    out.write("\n" + render_board(result.final_state, style) + "\n")
+    out.write("\n" + render_board(result.final_state, args.list) + "\n")
     out.write("\n" + render_summary(result) + "\n")
     if saved:
         out.write(f"saved: {saved}\n")
@@ -141,20 +140,27 @@ def _report(
 # --- commands ------------------------------------------------------------------------
 
 
-def cmd_game(
-    args: argparse.Namespace, out: IO[str], console: Console, kinds: dict[str, str]
-) -> int:
-    """``random`` and ``play``: a fresh game between the given kinds of player."""
+def _agents(args: argparse.Namespace, console: Console, kinds: dict[str, str]) -> dict[str, Any]:
+    """One agent per player. A human gets a random fallback for when they do not answer."""
     rng = random.Random(args.seed)
     agents: dict[str, Any] = {}
     for player, kind in kinds.items():
         if kind == "human":
             timeout = args.move_timeout or None
+            fallback = RandomAgent(rng)
             agents[player] = HumanAgent(
-                player, args.n, console, RandomAgent(rng), timeout, args.max_timeouts
+                player, args.n, console, fallback, timeout, args.max_timeouts
             )
         else:
             agents[player] = RandomAgent(rng)
+    return agents
+
+
+def cmd_game(
+    args: argparse.Namespace, out: IO[str], console: Console, kinds: dict[str, str]
+) -> int:
+    """``random`` and ``play``: a fresh game between the given kinds of player."""
+    agents = _agents(args, console, kinds)
     title = f"Hanoi Crossing  n={args.n}  A: {kinds['A']}  B: {kinds['B']}"
     result, pattern = _play(args, console, initial_state(args.n), agents, args.first, title)
     mode = "random" if set(kinds.values()) == {"random"} else "play"
@@ -179,8 +185,7 @@ def cmd_replay(args: argparse.Namespace, out: IO[str], console: Console, isatty:
 
     if not args.json:
         _report(args, out, result, meta, None)  # the recorded part, before continuing
-    rng = random.Random(args.seed)
-    agents: dict[str, Any] = {"A": RandomAgent(rng), "B": RandomAgent(rng)}
+    agents = _agents(args, console, {"A": "random", "B": "random"})
     first = "B" if rec.turn_order.endswith("A") else "A"
     console.say()
     more, pattern = _play(
@@ -239,7 +244,7 @@ def main(
     out = stdout or sys.stdout
     tty = isatty if isatty is not None else stdin.isatty()
     chat = (stderr or sys.stderr) if args.json else out
-    console = Console(LineReader(stdin), chat, "list" if args.list else "tower")
+    console = Console(LineReader(stdin), chat, args.list)
     try:
         if args.command == "replay":
             return cmd_replay(args, out, console, tty)

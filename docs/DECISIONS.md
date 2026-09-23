@@ -76,6 +76,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D53 | Plain tuples instead of `Literal` aliases | Structure | 🟪 engineering | active |
 | D54 | `Outcome` keeps only what it cannot derive | Structure | 🟪 engineering | active |
 | D55 | Nothing is kept for a caller that does not exist | Structure | 🟪 engineering | active |
+| D56 | The board style is a boolean, not a string | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -542,3 +543,12 @@ feature was kept; what changed is where each one lives.
   caller. Code kept for an imagined caller is code nobody maintains against reality.
 - **Rejected:** keeping the round trip symmetric for its own sake (adding `from_dict`
   again is 20 lines the day something reads that JSON back).
+
+### D56. The board style is a boolean, not a string
+- **Choice:** `render_view`, `render_board`, `_hand` and `Console` take `as_list:
+  bool`, straight from the `--list` flag. One `_agents` helper in `cli` builds the
+  players for both `cmd_game` and a continued replay.
+- **Reason:** the style was a two-value string built in the CLI, stored on the
+  console and compared against literals in four places, where a typo would silently
+  fall back to towers; and both commands built their random agents by hand.
+- **Rejected:** an enum (two values, one flag: a bool is the honest type).
