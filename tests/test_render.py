@@ -72,6 +72,19 @@ def test_board_tower_style_shows_both_sides() -> None:
     assert "=1=" in text
 
 
+def test_board_list_style_aligns_when_a_pole_holds_disk_2() -> None:
+    lines = render_board(initial_state(1), as_list=True).splitlines()
+    column = lines[2].index("[2]:")
+    assert lines[0].index("1a:") == column and lines[4].index("3a:") == column
+
+
+def test_tower_rows_stay_aligned_with_two_digit_disks() -> None:
+    text = render_board(initial_state(5))
+    rows = [line for line in text.splitlines() if "=" in line]
+    assert "==========10==========" in text
+    assert len({len(r) for r in rows}) == 1, "every disk row must be the same width"
+
+
 def test_board_list_style_uses_spec_cross_layout() -> None:
     s = _state(2, {"1a": (3, 1), "1b": (4,), "3b": (2,)})
     text = render_board(s, as_list=True)

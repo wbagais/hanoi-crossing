@@ -1,7 +1,7 @@
 """Text for the terminal: turn view, board, turn lines, summary, JSON result.
 
-Pure builders; nothing here prints. Style ``tower`` draws disks to scale, ``list``
-uses bracket lists in the spec's cross layout.
+Pure builders; nothing here prints. Towers draw the disks to scale; ``as_list``
+switches to bracket lists in the spec's cross layout.
 """
 
 from collections.abc import Sequence
@@ -18,8 +18,8 @@ TITLE_WIDTH = 37
 
 
 def _width(n: int) -> int:
-    """Column width: the largest disk (2n) needs 4n+1 chars; labels need 7; keep it odd."""
-    return max(4 * n + 1, 7)
+    """Column width: the largest disk is ``2n`` padded by 2n "=" each side; labels need 7."""
+    return max(4 * n + len(str(2 * n)), 7) | 1
 
 
 def _disk(d: int) -> str:
@@ -80,10 +80,9 @@ def render_board(state: State, as_list: bool = False) -> str:
     """The full final board, both sides (R12)."""
     p, hands = state.poles, state.hands
     if as_list:
-        middle = (
-            f"  1b: {_brackets(p['1b'])} --- [2]: {_brackets(p['2'])} --- 3b: {_brackets(p['3b'])}"
-        )
-        pad = " " * middle.index("[2]")
+        left = f"  1b: {_brackets(p['1b'])} --- "
+        middle = f"{left}[2]: {_brackets(p['2'])} --- 3b: {_brackets(p['3b'])}"
+        pad = " " * len(left)
         return "\n".join(
             [
                 f"{pad}1a: {_brackets(p['1a'])}",

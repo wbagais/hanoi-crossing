@@ -54,6 +54,7 @@ class Recording:
         check(all(isinstance(m, Action) for m in self.moves), "moves must be Actions", invalid)
         if self.sources is not None:
             check(len(self.sources) == len(self.moves), "sources need one entry per move", invalid)
+            check(all(isinstance(s, str) for s in self.sources), "sources must be strings", invalid)
             unknown = sorted(set(self.sources) - set(SOURCES))
             check(not unknown, f"unknown sources {unknown}; expected {SOURCES}", invalid)
 
@@ -105,7 +106,7 @@ def autosave_path(folder: Path, mode: str, n: int, seed: int) -> Path:
 
 def seed_in_name(path: Path) -> str | None:
     """The seed written into an autosaved file name, if there is one."""
-    match = re.search(r"seed(\d+)", path.name)
+    match = re.search(r"seed(-?\d+)", path.name)
     return match.group(1) if match else None
 
 
@@ -130,7 +131,7 @@ def append_run(rec: Recording, result: RunResult) -> Recording:
         rec.n,
         rec.turn_order + tail.turn_order,
         rec.moves + tail.moves,
-        head_sources + (tail.sources or ()),
+        head_sources + tail.sources,
     )
 
 

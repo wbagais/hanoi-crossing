@@ -74,6 +74,8 @@ def _with(**changes: object) -> str:
         _with(moves=["lift 1", "lift 1", "skip 3"]),
         _with(sources=["human"]),  # wrong length
         _with(sources=["human", "human", "alien"]),
+        _with(sources=[["x"], "human", "human"]),
+        _with(sources=[1, "alien", "human"]),
         _with(extra=1),
     ],
 )
@@ -94,6 +96,7 @@ def test_autosave_path_is_fresh_and_names_the_seed(tmp_path) -> None:  # noqa: A
     second = autosave_path(tmp_path / "recordings", "random", 2, 7)
     assert second != first and not second.exists()
     assert seed_in_name(first) == "7" and seed_in_name(tmp_path / "game.json") is None
+    assert seed_in_name(autosave_path(tmp_path / "r", "random", 1, -5)) == "-5"
 
 
 # --- replay / from_run / append_run -----------------------------------------------------
