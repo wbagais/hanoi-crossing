@@ -12,8 +12,8 @@ from dataclasses import dataclass
 PLAYERS = ("A", "B")
 VERBS = ("lift", "place", "skip")
 POLES = (1, 2, 3)
-POLE_KEYS = ("1a", "2", "3a", "1b", "3b")  # serialization order
-SHARED = "2"
+SHARED = "2"  # the middle pole both players can reach
+POLE_KEYS = ("1a", SHARED, "3a", "1b", "3b")  # serialization order
 
 SIDES: dict[str, dict[int, str]] = {
     "A": {1: "1a", 2: SHARED, 3: "3a"},

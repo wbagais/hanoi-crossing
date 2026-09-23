@@ -8,6 +8,8 @@ import pytest
 from hanoi_crossing import engine
 from hanoi_crossing.engine import (
     ALL_ACTIONS,
+    POLE_KEYS,
+    SIDES,
     Action,
     Observation,
     Outcome,
@@ -55,6 +57,11 @@ def test_action_parse_examples(text: str, action: Action) -> None:
 def test_action_parse_rejects_bad_text(bad: object) -> None:
     with pytest.raises(ValueError):
         Action.parse(bad)
+
+
+def test_pole_keys_are_exactly_the_poles_sides_names() -> None:
+    assert set(POLE_KEYS) == {key for side in SIDES.values() for key in side.values()}
+    assert len(POLE_KEYS) == 5
 
 
 def test_state_is_immutable_and_hashable() -> None:
