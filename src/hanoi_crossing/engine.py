@@ -224,26 +224,9 @@ def step(state: State, player: str, action: Action) -> tuple[State, Outcome]:
 
 
 def to_dict(state: State) -> dict:
-    """Plain JSON-compatible dict: ints, lists, None. Inverse of ``from_dict``."""
+    """The board as plain JSON data: ints, lists, None (for ``--json``)."""
     return {
         "n": state.n,
         "poles": {k: list(state.poles[k]) for k in POLE_KEYS},
         "hands": {p: state.hands[p] for p in PLAYERS},
     }
-
-
-def from_dict(data: object) -> State:
-    """Rebuild a State from ``to_dict`` output, validating shape and types."""
-    check(isinstance(data, dict), "state must be a dict with the keys n, poles, hands")
-    check(set(data) == {"n", "poles", "hands"}, "state needs the keys n, poles, hands")
-    n, poles, hands = data["n"], data["poles"], data["hands"]
-    check(is_positive_int(n), f"n must be a positive integer, got {n!r}")
-    check(isinstance(poles, dict) and set(poles) == set(POLE_KEYS), f"poles need keys {POLE_KEYS}")
-    check(isinstance(hands, dict) and set(hands) == set(PLAYERS), f"hands need keys {PLAYERS}")
-    for key, disks in poles.items():
-        ok = isinstance(disks, list | tuple) and all(is_positive_int(d) for d in disks)
-        check(ok, f"pole {key} must be a list of positive ints, got {disks!r}")
-    for p, held in hands.items():
-        ok = held is None or is_positive_int(held)
-        check(ok, f"hand {p} must be a positive int or null, got {held!r}")
-    return State(n=n, poles={k: tuple(poles[k]) for k in POLE_KEYS}, hands=dict(hands))

@@ -75,6 +75,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 | D52 | `--no-skip` and the `Agent` protocol removed | Structure | 🟪 engineering | active |
 | D53 | Plain tuples instead of `Literal` aliases | Structure | 🟪 engineering | active |
 | D54 | `Outcome` keeps only what it cannot derive | Structure | 🟪 engineering | active |
+| D55 | Nothing is kept for a caller that does not exist | Structure | 🟪 engineering | active |
 
 ## Rules
 
@@ -116,7 +117,7 @@ Each entry has the same four parts: **Context** (what raised the question),
   service holding many games (T5, T6).
 - **Choice:** frozen dataclasses; `step(state, player, action)` returns a new state
   and an outcome; no I/O, randomness, counters, or stored "finished" flag;
-  `winner(state)` is recomputed from the board; `to_dict` / `from_dict`.
+  `winner(state)` is recomputed from the board; `to_dict` gives plain JSON data.
 - **Reason:** thousands of games can be held as plain values; serialization is
   trivial; a state loaded from JSON needs no bookkeeping; an observation can never
   disagree with the board.
@@ -161,7 +162,7 @@ Each entry has the same four parts: **Context** (what raised the question),
 ### D24. `bool` is not an int
 - **Context:** `bool` subclasses `int` in Python; JSON `true` could arrive as disk
   size 1.
-- **Choice:** `initial_state` and `from_dict` reject `True` / `False` for `n`,
+- **Choice:** `initial_state` rejects `True` / `False` for `n`,
   disks, and hands.
 - **Reason:** a silent type confusion would corrupt a game.
 - **Rejected:** trusting the caller.
@@ -530,3 +531,14 @@ feature was kept; what changed is where each one lives.
   outside the tests read `done`; the player was validated up to seven times a turn.
 - **Rejected:** keeping `done` for callers who prefer a flag (`outcome.winner is not
   None` is as short and cannot disagree).
+
+### D55. Nothing is kept for a caller that does not exist
+- **Choice:** audited every class and function for a real user. `Outcome.done` and
+  `engine.from_dict` had none outside the tests and are gone; `to_dict` stays, since
+  `--json` prints it. `play_turn` stays: `run` calls it, and it is the one-turn seam
+  an RL wrapper would use.
+- **Reason:** `from_dict` was kept for a service that might load a board, but this
+  project's persistence is moves, never board states (D7), so the test was the only
+  caller. Code kept for an imagined caller is code nobody maintains against reality.
+- **Rejected:** keeping the round trip symmetric for its own sake (adding `from_dict`
+  again is 20 lines the day something reads that JSON back).

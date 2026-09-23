@@ -14,7 +14,6 @@ from hanoi_crossing.engine import (
     Observation,
     Outcome,
     State,
-    from_dict,
     initial_state,
     legal_actions,
     observe,
@@ -332,48 +331,6 @@ def test_to_dict_is_plain_json_compatible() -> None:
         "hands": {"A": None, "B": None},
     }
     json.dumps(d)  # must not raise
-
-
-def test_round_trip_initial_and_mid_game() -> None:
-    s = initial_state(3)
-    assert from_dict(to_dict(s)) == s
-    s, _ = step(s, "A", Action("lift", 1))
-    s, _ = step(s, "B", Action("lift", 1))
-    s, _ = step(s, "A", Action("place", 2))
-    assert from_dict(json.loads(json.dumps(to_dict(s)))) == s
-
-
-def _good() -> dict:
-    return {
-        "n": 1,
-        "poles": {"1a": [1], "2": [], "3a": [], "1b": [2], "3b": []},
-        "hands": {"A": None, "B": None},
-    }
-
-
-def _with(**changes: object) -> dict:
-    d = _good()
-    d.update(changes)
-    return d
-
-
-@pytest.mark.parametrize(
-    "bad",
-    [
-        {},
-        "not a dict",
-        _with(poles={}),
-        _with(poles={"1a": [1], "2": [], "3a": [], "1b": [2]}),  # missing 3b
-        _with(hands={"A": None}),  # missing B
-        _with(poles={"1a": ["1"], "2": [], "3a": [], "1b": [2], "3b": []}),  # str disk
-        _with(hands={"A": "x", "B": None}),
-        _with(n=0),
-        _with(n="1"),
-    ],
-)
-def test_from_dict_rejects_bad_shapes(bad: object) -> None:
-    with pytest.raises(ValueError):
-        from_dict(bad)  # type: ignore[arg-type]
 
 
 # --- invariants under random legal play; line budget: C1 -----------------------------

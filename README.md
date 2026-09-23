@@ -165,7 +165,7 @@ no stored "finished" flag: `winner(state)` is recomputed from the board.
 | `legal_actions(state, player)` | the subset of the seven actions legal now; the action mask |
 | `step(state, player, action)` | apply one action; returns a new state and an `Outcome` |
 | `winner(state)` | who has won, if anyone |
-| `to_dict` / `from_dict` | JSON round trip |
+| `to_dict` | the board as plain JSON data |
 
 The action space is fixed and index-stable: `lift 1..3`, `place 1..3`, `skip`. An
 illegal move returns the *same* state object plus a reason, so a wasted turn is
