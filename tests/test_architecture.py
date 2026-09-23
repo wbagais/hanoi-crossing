@@ -18,20 +18,13 @@ ALLOWED = {
 }
 
 
-def _local_imports(module: str) -> set[str]:
+@pytest.mark.parametrize("module", sorted(ALLOWED))
+def test_module_imports_only_what_the_blueprint_allows(module: str) -> None:
     tree = ast.parse((PACKAGE / f"{module}.py").read_text(encoding="utf-8"))
-    return {
-        node.module
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module
-    }
+    local = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.level == 1}
+    extra = local - ALLOWED[module]
+    assert not extra, f"{module} must not import {sorted(extra)}"
 
 
 def test_every_module_is_in_the_table() -> None:
     assert {p.stem for p in PACKAGE.glob("*.py")} - {"__init__"} == set(ALLOWED)
-
-
-@pytest.mark.parametrize("module", sorted(ALLOWED))
-def test_module_imports_only_what_the_blueprint_allows(module: str) -> None:
-    extra = _local_imports(module) - ALLOWED[module]
-    assert not extra, f"{module} must not import {sorted(extra)}"

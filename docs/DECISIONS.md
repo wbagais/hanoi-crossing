@@ -452,119 +452,80 @@ Each entry has the same four parts: **Context** (what raised the question),
 
 ## Structure
 
-### D45. Four rings; restructure, keep every feature
-- **Context:** review feedback: the code was not cleanly abstracted. Additions had
-  been attached to the nearest module: five of ten features had logic in `cli.py`
-  (498 lines, bigger than the engine), `recording` imported the runner, `render`
-  re-stepped whole games.
-- **Choice:** keep every feature; reorganise into four rings, each importing only
-  inward: core (`engine`), play (`agents`, `runner`), frontends (`recording`,
-  `render`, `human`), entry (`cli`). Additions live in rings 3–4 and may not change
-  ring 1. The blueprint is in `CLAUDE.md`.
-- **Reason:** the problem was structure, not scope; one rule tells where anything goes.
-- **Rejected:** cutting back to the spec's two modes (hides the problem instead of
-  fixing it).
+Reworked after review feedback that the code was not cleanly abstracted. Every
+feature was kept; what changed is where each one lives.
 
-### D46. `Outcome` carries the moved disk; `Action` owns its text
-- **Context:** three places worked out which disk moved (one replayed the game), and
-  action text was formatted in two modules and parsed in a third.
-- **Choice:** `Outcome.disk` is the disk lifted or placed; `str(action)` and
-  `Action.parse(text)` live on `Action`. `SIDES` is the one table of each player's
-  pole keys; `is_positive_int` the one integer check.
-- **Reason:** carry facts forward instead of recomputing them; one source of truth.
-- **Rejected:** a separate text-format module (the action's text is part of the
-  action space an RL or network client uses).
+### D45. Four rings
+- **Context:** additions had been attached to the nearest module: five of ten
+  features had logic in `cli.py` (498 lines, bigger than the engine), `recording`
+  imported the runner, `render` re-stepped whole games to describe them.
+- **Choice:** core (`engine`) <- play (`agents`, `runner`) <- frontends
+  (`recording`, `render`, `human`) <- entry (`cli`); imports point inward only, and
+  an addition may not change the core. The table is in `CLAUDE.md`, enforced by
+  `tests/test_architecture.py`.
+- **Reason:** the problem was structure, not scope; one rule says where anything goes.
+- **Rejected:** cutting back to the spec's two modes (hides the problem).
 
-### D47. One `source` label per agent
-- **Context:** D26 gave agents two attributes, and the runner combined them into
-  `Turn.source`: display bookkeeping inside the core loop.
-- **Choice:** an agent has one attribute, `source`, the label of the move it just
-  chose; the runner copies it. `HumanAgent` sets `timeout` when its fallback moved.
-- **Reason:** the agent knows who chose; the runner should not decide it.
-- **Rejected:** `choose` returning `(action, source)` (still leaks into the contract
-  an RL policy implements).
+### D46. Facts are carried, not recomputed
+- **Choice:** `Outcome.disk` reports the disk lifted or placed; `str(action)` and
+  `Action.parse` live on `Action`; `SIDES` is the one pole table and
+  `is_positive_int` the one integer check.
+- **Reason:** three places used to work out which disk moved, one by replaying the
+  whole game; action text was formatted in two modules and parsed in a third.
+- **Rejected:** a text-format module (a move's text belongs to the action space).
 
-### D48. Human play is its own frontend module
-- **Context:** the prompt, the threaded stdin reader, quit handling, and timeout
-  counting sat in `cli.py`, while `ExternalAgent` and `Timeout` sat in the core
-  `agents.py` although only human play used them.
-- **Choice:** `human.py` holds `LineReader`, `Console` (prompts in, turn lines out),
-  and `HumanAgent` (prompt, re-prompt, fallback on timeout, `StopGame`). `agents.py`
+### D47. One `source` label per agent (supersedes D26)
+- **Choice:** an agent carries `source`, the label of the move it just chose, and the
+  runner copies it onto the turn.
+- **Reason:** the agent knows who chose; the runner was combining two flags to guess.
+- **Rejected:** `choose` returning `(action, source)` (leaks display into the contract).
+
+### D48. Human play is its own frontend (supersedes D9, D27)
+- **Choice:** `human.py` holds `LineReader`, `Console` and `HumanAgent`; `agents.py`
   keeps only `RandomAgent` and `ScriptedAgent`.
-- **Reason:** an addition lives in the frontend ring and can be removed without
-  touching the core; one class replaces `ExternalAgent` + the `ask` callback + the
-  prompt object.
-- **Rejected:** keeping a generic injected-`ask` agent for a future UI or LLM (not
-  built; such an agent is one small class when it is).
+- **Reason:** the prompt, reader thread and timeout counting were in `cli.py`, and
+  `ExternalAgent` sat in the core although only human play used it. One class now
+  replaces `ExternalAgent` plus its `ask` callback plus the prompt object.
+- **Rejected:** a generic injected-`ask` agent for a future UI or LLM (not built).
 
-### D49. One wording for what a turn did
-- **Context:** three texts described a turn: `ok, holding 1` after a human move,
-  `lift 2 → took disk 1 from the shared pole` for bots, and the trace, each derived
-  differently.
+### D49. One wording for what a turn did (extends D39)
 - **Choice:** `render.describe_turn` (`took disk 1 from pole 1`, `put disk 3 on the
-  shared pole`, `illegal: … Turn wasted.`) is used by the trace, bot lines, and human
-  feedback; it reads `Outcome.disk` (D46).
-- **Reason:** one source of truth; shared-pole events read the same everywhere.
-- **Rejected:** keeping `ok, holding N` for humans (a second phrasing of the same fact).
+  shared pole`, `illegal: ... Turn wasted.`) serves the trace, bot lines and human
+  feedback alike.
+- **Reason:** three phrasings of the same fact, each derived differently.
+- **Rejected:** keeping `ok, holding N` for humans.
 
-### D50. Recording owns its files; CLI only wires
-- **Context:** autosave naming, the seed-from-file-name regex, and gluing a continued
-  game onto its recording were in `cli.py`; recordings stored moves as text and
-  re-parsed them on every use.
-- **Choice:** `recording.py` gains `autosave_path`, `seed_in_name`, `append_run`;
-  `Recording.moves` are `Action`s, converted to text only in `loads`/`dumps`, and
-  validation lives only in `Recording`. The CLI builds agents, calls the runner, and
-  prints; `--save`/`--no-save` now also apply to a continued replay.
-- **Reason:** each concern in the module that owns it; `cli.py` 498 → 280 lines.
-- **Rejected:** a separate `files.py` (one more module for three small functions).
+### D50. Recording owns its files; the CLI only wires
+- **Choice:** `recording.py` gains `autosave_path`, `seed_in_name` and `append_run`;
+  `Recording.moves` are `Action`s, text only in `loads`/`dumps`; validation lives in
+  `Recording` alone. `--save`/`--no-save` now cover a continued replay too.
+- **Reason:** file naming and continuation glue were in `cli.py` (498 -> 263 lines).
+- **Rejected:** a separate `files.py` for three small functions.
 
 ### D51. An `Action` is checked when it is built
-- **Context:** after the restructure the code was better organised but barely
-  smaller, so the author asked for a real reduction with every feature kept.
 - **Choice:** `Action.__post_init__` rejects a malformed move, so `engine._validate`
-  disappears and `step` only checks the player and the type; one `check(ok, message,
-  error)` helper replaces the repeated `if ...: raise ...` pairs in `from_dict` and
-  `Recording`; module docstrings were cut to a few lines each, with the reasoning
-  left here where it belongs.
-- **Reason:** a malformed action can no longer exist, so nothing downstream has to
-  ask; `src/` is 1 329 -> 1 183 lines (801 of them code) with all ten features.
-- **Rejected:** a table-driven `add_argument` loop (tried: 7 lines longer once
-  formatted, and harder to read); deleting features (they were asked to stay).
+  is gone; `check(ok, message, error)` replaces repeated `if ...: raise ...` pairs.
+- **Reason:** a malformed action cannot exist, so nothing downstream asks again.
+- **Rejected:** a table-driven `add_argument` loop (tried: longer and less readable).
 
 ### D52. `--no-skip` and the `Agent` protocol removed
-- **Context:** going through the code file by file, two things had no owner: the
-  `Agent` protocol, which no type checker in this project ever checks, and
-  `--no-skip`, an option in no requirement, no decision, and nothing but a row in
-  docs/USAGE.md. `allow_skip` also made a game-wide preference a per-agent one.
-- **Choice:** delete both. The agent contract is two sentences in the `agents`
-  docstring; `RandomAgent` now takes only the generator and picks from `legal`.
-- **Reason:** nothing asked for either, and each cost lines in three files.
-- **Rejected:** keeping `--no-skip` for shorter random games (`--max-turns` and
-  `--repetition-limit` already bound a game).
+- **Choice:** delete both; the agent contract is two sentences in the `agents`
+  docstring, and `RandomAgent` takes only the generator.
+- **Reason:** no requirement asked for either, no type checker ran the protocol, and
+  `allow_skip` made a game-wide preference a per-agent one.
+- **Rejected:** keeping `--no-skip` for shorter games (`--max-turns` already bounds one).
 
 ### D53. Plain tuples instead of `Literal` aliases
-- **Context:** `Player`, `Verb`, `PoleIndex` and `Status` were `Literal` types, and
-  the same values were written again as runtime tuples and as inline checks. No type
-  checker runs here, so the aliases only cost a second copy of each value.
-- **Choice:** keep one tuple per set (`PLAYERS`, `VERBS`, `POLES`, `POLE_KEYS`) and
-  hint with `str` / `int`. `Action.__post_init__` checks against `VERBS` and `POLES`,
-  so every value is written once. The 6 `# type: ignore` comments the aliases needed
-  are gone too.
-- **Reason:** one source per value; nothing was verifying the narrower hints.
-- **Rejected:** `get_args(Literal[...])` to derive the tuples (keeps the meaning in
-  the hints, but adds an import and a layer for a reader to follow).
+- **Choice:** `PLAYERS`, `VERBS`, `POLES`, `POLE_KEYS`; hints are `str` / `int`.
+- **Reason:** each value had been written twice, as a type and as data, with no type
+  checker verifying the narrower version. Six `# type: ignore` comments went too.
+- **Rejected:** `get_args(Literal[...])` (keeps the hints, adds a layer to follow).
 
 ### D54. `Outcome` keeps only what it cannot derive
-- **Context:** `Outcome(legal, reason, winner, done, disk)` held two fields that
-  restated others: `legal` was always `reason is None`, `done` always `winner is not
-  None`, and nothing outside the tests read `done`. Two fields that could contradict
-  the rest. The acting player was also validated twice per `step`, and seven times
-  per `legal_actions`, because `pole_key` re-checked what its caller had checked.
 - **Choice:** `Outcome` stores `reason`, `winner`, `disk`; `legal` and `done` are
-  properties. `step` now reads `Outcome("game is over", already)`, `Outcome(reason)`,
-  `Outcome()`, `Outcome(winner=won, disk=disk)`. `pole_key` is gone: the public
-  functions check the player once with `_require_player`, and the internals index
-  `SIDES` directly.
-- **Reason:** fewer facts to keep consistent, and each checked once.
-- **Rejected:** keeping `done` for callers who prefer a flag (the property reads the
-  same at the call site).
+  properties. `pole_key` is gone: public functions check the player once, internals
+  index `SIDES`.
+- **Reason:** `legal` restated `reason is None` and `done` restated `winner is not
+  None`, so three fields could contradict two; the player was validated up to seven
+  times per turn.
+- **Rejected:** keeping `done` as a field (the property reads the same).
