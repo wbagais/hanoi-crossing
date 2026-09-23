@@ -40,7 +40,7 @@ def test_tower_view_column_width_scales_with_n() -> None:
         text = render_view(observe(s, "B"), player="B", index=1, n=n, legal=[])
         base = next(line for line in text.splitlines() if set(line.strip()) == {"-", " "})
         width = len(base.split()[0])
-        assert width >= 4 * n + 1 and width % 2 == 1
+        assert width == {1: 7, 2: 9, 3: 13}[n], "column width is fixed per n"
         biggest = "=" * (2 * n) + str(2 * n) + "=" * (2 * n)
         assert biggest in text
 
@@ -100,8 +100,10 @@ def test_board_list_style_uses_spec_cross_layout() -> None:
 # --- outcome text, trace, summary ----------------------------------------------------
 
 
-def _result(turns: list[Turn], status: str = "won", winner: str | None = "A") -> RunResult:
-    return RunResult(initial_state(1), tuple(turns), status, winner, 0)  # type: ignore[arg-type]
+def _result(
+    turns: list[Turn], status: str = "won", winner: str | None = "A", unplayed: int = 0
+) -> RunResult:
+    return RunResult(initial_state(1), tuple(turns), status, winner, unplayed)  # type: ignore[arg-type]
 
 
 def _turn(
@@ -142,9 +144,9 @@ def test_summary_counts() -> None:
         _turn(3, "A", Action("skip")),
         _turn(4, "B", Action("lift", 1), source="timeout"),
     ]
-    text = render_summary(_result(turns))
+    text = render_summary(_result(turns, unplayed=7))
     assert text == (
-        "status won · winner A · played 4 · illegal 1 · skipped 1 · timeouts 1 · unplayed 0"
+        "status won · winner A · played 4 · illegal 1 · skipped 1 · timeouts 1 · unplayed 7"
     )
     assert render_summary(_result([], "unfinished", None)).startswith(
         "status unfinished · winner -"
@@ -152,9 +154,16 @@ def test_summary_counts() -> None:
 
 
 def test_result_dict_is_plain_json_data() -> None:
-    data = result_dict(_result([_turn(1, "A", Action("lift", 1))]))
+    turns = [_turn(1, "A", Action("lift", 1)), _turn(2, "B", Action("place", 1), legal=False)]
+    data = result_dict(_result(turns, unplayed=3))
     assert data["status"] == "won" and data["winner"] == "A"
-    assert data["counts"]["played"] == 1
+    assert data["counts"] == {
+        "played": 2,
+        "illegal": 1,
+        "skipped": 0,
+        "timeouts": 0,
+        "unplayed": 3,
+    }
     assert data["turns"] == [
         {
             "index": 1,
@@ -163,5 +172,13 @@ def test_result_dict_is_plain_json_data() -> None:
             "legal": True,
             "reason": None,
             "source": "random",
-        }
+        },
+        {
+            "index": 2,
+            "player": "B",
+            "action": "place 1",
+            "legal": False,
+            "reason": "hand is empty",
+            "source": "random",
+        },
     ]
